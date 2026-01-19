@@ -1,5 +1,5 @@
 from flask import Flask, render_template, url_for, jsonify
-from pymongo import MongoClient
+from pymongo import MongoClient, ASCENDING
 from datetime import datetime, timedelta
 from flask_apscheduler import APScheduler
 import requests, json, os, time
@@ -13,30 +13,26 @@ mongoURI = os.getenv('MONGODB_URI')
 client = MongoClient(mongoURI)
 db = client.flask_database
 events_collection = db.events
-settings_collection = db.settings  # New collection for timer state
-
-# Cache for Event IDs to prevent re-fetching details we already have
+settings_collection = db.settings
+events_collection.create_index([("CreatedAt", ASCENDING)], expireAfterSeconds=36000)
 last_fetched_ids = set()
 
 def load_existing_ids():
     """Load existing EventIds from DB on startup to avoid API spam."""
     global last_fetched_ids
     try:
-        # Get all EventIds currently in our database
         existing = events_collection.find({}, {'EventId': 1})
         last_fetched_ids = set(doc['EventId'] for doc in existing)
         print(f"Loaded {len(last_fetched_ids)} existing events from DB.")
     except Exception as e:
         print(f"Error loading existing IDs: {e}")
 
-# Load IDs immediately on startup
 load_existing_ids()
 
 def get_scheduler_status():
     """Read the timer status from MongoDB."""
     status = settings_collection.find_one({'_id': 'scheduler_status'})
     if not status:
-        # Default if not found (run immediately)
         return {
             'last_check': 'Waiting for first run...',
             'next_run': time.time() 
@@ -45,7 +41,6 @@ def get_scheduler_status():
 
 def update_scheduler_status(last_check_time):
     """Save the timer status to MongoDB."""
-    # Set next run to 90 seconds from NOW
     next_run = time.time() + 90
     settings_collection.update_one(
         {'_id': 'scheduler_status'},
@@ -82,8 +77,6 @@ def fetch_and_check_events():
     current_ids = fetch_event_ids()
     if not current_ids:
         return
-
-    # Only process IDs we haven't seen before
     new_ids = current_ids - last_fetched_ids
 
     if new_ids:
@@ -92,6 +85,12 @@ def fetch_and_check_events():
             event_details = fetch_event_details(event_id)
             if event_details:
                 try:
+                    try:
+                        dt_object = datetime.fromisoformat(event_details['TimeStamp'].replace('Z', '+00:00'))
+                    except ValueError:
+                        dt_object = datetime.now()
+                    event_details['CreatedAt'] = dt_object
+
                     events_collection.update_one(
                         {'EventId': event_details['EventId']},
                         {'$set': event_details},
@@ -155,7 +154,6 @@ def home():
         processed_event = {**event, 'TimeStamp': timestamp}
         processed_datas.append(processed_event)
     
-    # Get status from DB
     status = get_scheduler_status()
     
     return render_template('home.html', 
