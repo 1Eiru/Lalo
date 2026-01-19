@@ -1,27 +1,32 @@
-from flask import Flask, render_template, url_for, jsonify, Response
+from flask import Flask, render_template, url_for, jsonify
 from pymongo import MongoClient
 from datetime import datetime, timedelta
 from flask_apscheduler import APScheduler
-import requests,json, os
+import requests, json, os, time
 
 app = Flask(__name__)
 scheduler = APScheduler()
 scheduler.init_app(app)
 scheduler.start()
 
-
 mongoURI = os.getenv('MONGODB_URI')
 client = MongoClient(mongoURI)
 db = client.flask_database
 events_collection = db.events
 
-last_update_time = None
+# Global variables
+last_update_time = "Waiting for first update..."
 last_fetched_ids = set()
+next_update_timestamp = time.time() + 90 
 
 def fetch_event_ids():
-    response = requests.get('https://gameinfo-sgp.albiononline.com/api/gameinfo/events')
-    data = response.json()
-    return set(event['EventId'] for event in data)
+    try:
+        response = requests.get('https://gameinfo-sgp.albiononline.com/api/gameinfo/events')
+        data = response.json()
+        return set(event['EventId'] for event in data)
+    except Exception as e:
+        print(f"Error fetching IDs: {e}")
+        return set()
 
 def fetch_event_details(event_id):
     response = requests.get(f'https://gameinfo-sgp.albiononline.com/api/gameinfo/events/{event_id}')
@@ -32,6 +37,9 @@ def fetch_and_check_events():
     global last_update_time, last_fetched_ids
 
     current_ids = fetch_event_ids()
+    if not current_ids:
+        return False
+
     new_ids = current_ids - last_fetched_ids
 
     if new_ids:
@@ -49,43 +57,19 @@ def fetch_and_check_events():
         last_fetched_ids = current_ids
         last_update_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         print(f"Updated {len(new_ids)} new events.")
-        return True  # new events found
+        return True
     else:
         print("No new events found.")
-        return False  # nno new events found
+        return False
 
 @scheduler.task('interval', id='regular_check', seconds=90, misfire_grace_time=900)
 def scheduled_update_event():
+    global next_update_timestamp
+    
     with app.app_context():
-        if not fetch_and_check_events():
-           
-            scheduler.add_job(
-                func=scheduled_update_event, 
-                trigger='date', 
-                run_date=datetime.now() + timedelta(seconds=3), 
-                id='delayed_event_check',  
-                replace_existing=True      
-            )
-
-@app.route("/")
-@app.route("/home")
-def home():
-    datas = events_collection.find().sort("TimeStamp", -1).limit(50)
-    processed_datas = []
-    for event in datas:
-        try:
-            timestamp = datetime.fromisoformat(event['TimeStamp'].replace('Z', '+00:00'))
-        except ValueError:
-            timestamp = event['TimeStamp']
-
-        processed_event = {**event, 'TimeStamp': timestamp}
-        processed_datas.append(processed_event)
-    return render_template('home.html', datas=processed_datas, last_update=last_update_time)
-
-@app.route("/events/<int:event_id>")
-def events(event_id):
-    data = events_collection.find({'EventId': event_id})
-    return render_template('events.html', events=data)
+        # update logic
+        fetch_and_check_events()
+        next_update_timestamp = time.time() + 90
 
 def get_latest_events():
     datas = events_collection.find().sort("TimeStamp", -1).limit(50)
@@ -105,19 +89,38 @@ def get_latest_events():
         processed_datas.append(processed_event)
     return processed_datas
 
-def event_stream():
-    while True:
-        with app.app_context():
-            latest_events = get_latest_events()
-            data = {
-                'events': latest_events,
-                'last_update': last_update_time
-            }
-            yield f"data: {json.dumps(data)}\n\n"
+@app.route("/")
+@app.route("/home")
+def home():
+    datas = events_collection.find().sort("TimeStamp", -1).limit(50)
+    processed_datas = []
+    for event in datas:
+        try:
+            timestamp = datetime.fromisoformat(event['TimeStamp'].replace('Z', '+00:00'))
+        except ValueError:
+            timestamp = event['TimeStamp']
 
-@app.route('/stream')
-def stream():
-    return Response(event_stream(), content_type='text/event-stream')
+        processed_event = {**event, 'TimeStamp': timestamp}
+        processed_datas.append(processed_event)
+
+    return render_template('home.html', 
+                           datas=processed_datas, 
+                           last_update=last_update_time,
+                           next_update_ts=next_update_timestamp)
+
+@app.route("/events/<int:event_id>")
+def events(event_id):
+    data = events_collection.find({'EventId': event_id})
+    return render_template('events.html', events=data)
+
+@app.route('/api/updates')
+def api_updates():
+    latest_events = get_latest_events()
+    return jsonify({
+        'events': latest_events,
+        'last_update': last_update_time,
+        'next_update_ts': next_update_timestamp # Send the sync time to client
+    })
 
 if __name__ == '__main__':
     app.run(threaded=True)

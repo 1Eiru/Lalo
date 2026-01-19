@@ -1,7 +1,15 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="row justify-content-center">
-    <p id="refreshTimer" class="text-center">Last update: {{ last_update if last_update else 'Never' }}</p>
+    <div class="text-center mb-3">
+        <p class="h5">Last update: <span id="lastUpdateDisplay">{{ last_update }}</span></p>
+        <!-- Timer Display -->
+        <p class="text-muted small">
+            Next server check in: 
+            <span id="countdownTimer" class="fw-bold text-primary">--</span> seconds
+        </p>
+    </div>
+
     <table id="eventsTable" class="table table-responsive w-50 shadow">
         <thead>
             <tr>
@@ -40,18 +48,55 @@
 {% block scripts %}
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script>
-    const timerDisplay = document.getElementById('refreshTimer');
-    const evtSource = new EventSource("{{ url_for('stream') }}");
-    let lastUpdateTime = "{{ last_update if last_update else 'Never' }}";
+    let targetTimestamp = Number("{{ next_update_ts | default('0') }}");
+    let currentLastUpdateTime = "{{ last_update }}";
+    const timerDisplay = document.getElementById('countdownTimer');
+    const lastUpdateDisplay = document.getElementById('lastUpdateDisplay');
+    let isFetching = false;
 
-    evtSource.onmessage = function(event) {
-        const data = JSON.parse(event.data);
-        if (data.last_update !== lastUpdateTime) {
-            updateTable(data.events);
-            updateTimer(data.last_update);
-            lastUpdateTime = data.last_update;
-        }
-    };
+    function startSyncTimer() {
+        setInterval(() => {         
+            const now = Math.floor(Date.now() / 1000);
+
+            const secondsRemaining = Math.floor(targetTimestamp - now);
+
+            if (secondsRemaining > 0) {
+                timerDisplay.innerText = secondsRemaining;
+                timerDisplay.className = "fw-bold text-primary";
+            } else {
+                timerDisplay.innerText = "Updating...";
+                timerDisplay.className = "fw-bold text-warning";
+
+                if (!isFetching) {
+                    checkForUpdates();
+                }
+            }
+        }, 1000);
+    }
+
+    function checkForUpdates() {
+        isFetching = true;
+        console.log("Fetching updates...");
+
+        $.getJSON("/api/updates", function(data) {
+            targetTimestamp = data.next_update_ts;
+
+            if (data.last_update !== currentLastUpdateTime) {
+                updateTable(data.events);
+                lastUpdateDisplay.textContent = data.last_update;
+                currentLastUpdateTime = data.last_update;
+                console.log("Table updated.");
+            } else {
+                console.log("No new data, but timer reset.");
+            }
+            
+            isFetching = false;
+        }).fail(function() {
+            console.log("Server error. Retrying in 5s...");
+            targetTimestamp = Math.floor(Date.now() / 1000) + 5;
+            isFetching = false;
+        });
+    }
 
     function updateTable(events) {
         var tableBody = $("#eventsTable tbody");
@@ -59,9 +104,12 @@
         $.each(events, function(index, event) {
             var row = $("<tr>");
             row.append($("<td>").text(index + 1));
-            row.append($("<td>").append($("<a>")
+            
+            var link = $("<a>")
                 .attr("href", "/events/" + event.EventId)
-                .text(event.EventId)));
+                .text(event.EventId);
+            row.append($("<td>").append(link));
+            
             row.append($("<td>").text(event.TimeStamp));
             row.append($("<td>").text(event.KillerName));
             row.append($("<td>").text(event.VictimName));
@@ -69,8 +117,8 @@
         });
     }
 
-    function updateTimer(time) {
-        timerDisplay.textContent = `Last update: ${time}`;
-    }
+    $(document).ready(function() {
+        startSyncTimer();
+    });
 </script>
 {% endblock %}
