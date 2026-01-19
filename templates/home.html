@@ -48,25 +48,31 @@
 {% block scripts %}
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script>
+    // Use Number() and default to 0 to prevent syntax errors
     let targetTimestamp = Number("{{ next_update_ts | default('0') }}");
     let currentLastUpdateTime = "{{ last_update }}";
+    
     const timerDisplay = document.getElementById('countdownTimer');
     const lastUpdateDisplay = document.getElementById('lastUpdateDisplay');
     let isFetching = false;
 
     function startSyncTimer() {
-        setInterval(() => {         
+        setInterval(() => {
+            // Get current time in seconds (Unix timestamp)
             const now = Math.floor(Date.now() / 1000);
-
+            
+            // Calculate difference
             const secondsRemaining = Math.floor(targetTimestamp - now);
 
             if (secondsRemaining > 0) {
                 timerDisplay.innerText = secondsRemaining;
                 timerDisplay.className = "fw-bold text-primary";
             } else {
+                // Time is up!
                 timerDisplay.innerText = "Updating...";
                 timerDisplay.className = "fw-bold text-warning";
-
+                
+                // Trigger fetch if not already fetching
                 if (!isFetching) {
                     checkForUpdates();
                 }
@@ -79,20 +85,32 @@
         console.log("Fetching updates...");
 
         $.getJSON("/api/updates", function(data) {
-            targetTimestamp = data.next_update_ts;
+            // 1. Update the Target Timestamp
+            let newTarget = data.next_update_ts;
+            const now = Math.floor(Date.now() / 1000);
 
+            // SAFETY CHECK: If the server returns a time that is already passed
+            // (e.g. server is busy and hasn't updated the DB yet),
+            // we force a 5-second delay to prevent an infinite loop.
+            if (newTarget <= now) {
+                console.log("Server time is in the past. Waiting 5 seconds...");
+                targetTimestamp = now + 5;
+            } else {
+                targetTimestamp = newTarget;
+            }
+            
+            // 2. Update the table if data changed
             if (data.last_update !== currentLastUpdateTime) {
                 updateTable(data.events);
                 lastUpdateDisplay.textContent = data.last_update;
                 currentLastUpdateTime = data.last_update;
                 console.log("Table updated.");
-            } else {
-                console.log("No new data, but timer reset.");
             }
             
             isFetching = false;
         }).fail(function() {
             console.log("Server error. Retrying in 5s...");
+            // If error, try again in 5 seconds
             targetTimestamp = Math.floor(Date.now() / 1000) + 5;
             isFetching = false;
         });
