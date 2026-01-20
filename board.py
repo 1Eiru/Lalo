@@ -1,4 +1,4 @@
-from flask import Flask, render_template, url_for, jsonify
+from flask import Flask, render_template, url_for, jsonify, request
 from pymongo import MongoClient, ASCENDING
 from datetime import datetime, timedelta, timezone
 from flask_apscheduler import APScheduler
@@ -113,7 +113,6 @@ def fetch_and_check_events():
     else:
         print("No new events found.")
 
-
 @scheduler.task('interval', id='regular_check', seconds=30, misfire_grace_time=900)
 def scheduled_update_event():
     with app.app_context():
@@ -200,7 +199,6 @@ def get_player_data(player_id):
     if cached:
         print(f"Serving {player_id} from MongoDB cache.")
         return cached['data']
-    
     print(f"Fetching {player_id} from API...")
     template_data = fetch_player_from_api(player_id)
     
@@ -322,6 +320,23 @@ def api_updates():
         'last_update': status.get('last_check'),
         'next_update_ts': status.get('next_run')
     })
+
+@app.route('/api/search')
+def search_proxy():
+    query = request.args.get('q', '')
+    if not query or len(query) < 2:
+        return jsonify({'players': []})
+    try:
+        url = f"https://gameinfo-sgp.albiononline.com/api/gameinfo/search?q={query}"
+        headers = {'User-Agent': 'Mozilla/5.0'} 
+        response = requests.get(url, headers=headers)
+        if response.status_code == 200:
+            return jsonify(response.json())
+        else:
+            print(f"API Error: {response.status_code}")       
+    except Exception as e:
+        print(f"Search Exception: {e}")   
+    return jsonify({'players': []})
 
 if __name__ == '__main__':
     app.run(threaded=True)
