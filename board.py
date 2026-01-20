@@ -1,6 +1,6 @@
 from flask import Flask, render_template, url_for, jsonify
 from pymongo import MongoClient, ASCENDING
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from flask_apscheduler import APScheduler
 import requests, json, os, time
 
@@ -12,9 +12,19 @@ scheduler.start()
 mongoURI = os.getenv('MONGODB_URI')
 client = MongoClient(mongoURI)
 db = client.flask_database
+
+# Collections
 events_collection = db.events
 settings_collection = db.settings
+cache_collection = db.player_cache
+
+# Indexes
 events_collection.create_index([("CreatedAt", ASCENDING)], expireAfterSeconds=36000)
+
+# CACHE
+CACHE_DURATION = 120 
+cache_collection.create_index([("last_updated", ASCENDING)], expireAfterSeconds=CACHE_DURATION)
+
 last_fetched_ids = set()
 
 def load_existing_ids():
@@ -135,11 +145,136 @@ def get_latest_events():
             'EventId': event['EventId'],
             'TimeStamp': timestamp.strftime('%Y-%m-%d %H:%M:%S') if isinstance(timestamp, datetime) else str(timestamp),
             'KillerName': event['Killer']['Name'],
-            'VictimName': event['Victim']['Name']
+            'KillerId': event['Killer']['Id'],
+            'VictimName': event['Victim']['Name'],
+            'VictimId': event['Victim']['Id']
         }
         processed_datas.append(processed_event)
     return processed_datas
 
+def fetch_player_from_api(player_id):
+    """Handles the raw API calls to Albion Online."""
+    player_info = {}
+    kills = []
+    deaths = []
+
+    try:
+        r_stats = requests.get(f'https://gameinfo-sgp.albiononline.com/api/gameinfo/players/{player_id}')
+        if r_stats.status_code == 200:
+            player_info = r_stats.json()
+    except Exception as e:
+        print(f"Error fetching player stats: {e}")
+
+    try:
+        r_kills = requests.get(f'https://gameinfo-sgp.albiononline.com/api/gameinfo/players/{player_id}/kills')
+        if r_kills.status_code == 200:
+            kills = r_kills.json()
+    except Exception as e:
+        print(f"Error fetching kills: {e}")
+
+    try:
+        r_deaths = requests.get(f'https://gameinfo-sgp.albiononline.com/api/gameinfo/players/{player_id}/deaths')
+        if r_deaths.status_code == 200:
+            deaths = r_deaths.json()
+    except Exception as e:
+        print(f"Error fetching deaths: {e}")
+
+    if not player_info:
+        if kills:
+            p = kills[0]['Killer']
+            player_info = {'Name': p['Name'], 'GuildName': p['GuildName'], 'KillFame': p['KillFame'], 'DeathFame': p['DeathFame'], 'LifetimeStatistics': None}
+        elif deaths:
+            p = deaths[0]['Victim']
+            player_info = {'Name': p['Name'], 'GuildName': p['GuildName'], 'KillFame': p['KillFame'], 'DeathFame': p['DeathFame'], 'LifetimeStatistics': None}
+        else:
+            player_info = {'Name': 'Unknown', 'GuildName': '-', 'KillFame': 0, 'DeathFame': 0, 'LifetimeStatistics': None}
+
+    return {
+        'player': player_info,
+        'kills': kills,
+        'deaths': deaths
+    }
+
+def get_player_data(player_id):
+    cached = cache_collection.find_one({'player_id': player_id})
+    if cached:
+        print(f"Serving {player_id} from MongoDB cache.")
+        return cached['data']
+    
+    print(f"Fetching {player_id} from API...")
+    template_data = fetch_player_from_api(player_id)
+    
+    cache_collection.update_one(
+        {'player_id': player_id},
+        {'$set': {
+            'player_id': player_id,
+            'data': template_data,
+            'last_updated': datetime.now(timezone.utc)
+        }},
+        upsert=True
+    )
+    return template_data
+
+def calculate_estimated_loss(victim_data):
+    """
+    Calculates estimated silver lost based on Equipment and Inventory.
+    Uses East Albion Data API.
+    """
+    items_to_fetch = set()
+    #(Type, Quality, Count)
+    all_items = []
+
+    #quipment
+    if victim_data.get('Equipment'):
+        for key, item in victim_data['Equipment'].items():
+            if item:
+                items_to_fetch.add(item['Type'])
+                all_items.append((item['Type'], item['Quality'], item['Count']))
+    # Inventory
+    if victim_data.get('Inventory'):
+        for item in victim_data['Inventory']:
+            if item:
+                items_to_fetch.add(item['Type'])
+                all_items.append((item['Type'], item['Quality'], item['Count']))
+
+    if not items_to_fetch:
+        return 0
+
+    locations = "Caerleon,Bridgewatch,Martlock,Thetford,Lymhurst,Fortsterling"
+    item_str = ",".join(items_to_fetch)
+    url = f"https://east.albion-online-data.com/api/v2/stats/prices/{item_str}.json?locations={locations}&qualities=1,2,3,4,5"
+
+    try:
+        resp = requests.get(url)
+        if resp.status_code != 200:
+            print(f"Price API Error: {resp.status_code}")
+            return 0
+        price_data = resp.json()
+    except Exception as e:
+        print(f"Price Fetch Error: {e}")
+        return 0
+
+    price_map = {} 
+    for entry in price_data:
+        p_min = entry.get('sell_price_min', 0)
+        if p_min > 0:
+            key = (entry['item_id'], entry['quality'])
+            if key not in price_map:
+                price_map[key] = []
+            price_map[key].append(p_min)
+    # Total
+    total_est_value = 0
+    for i_id, i_qual, i_count in all_items:
+        key = (i_id, i_qual)
+        if key in price_map:
+            avg_price = sum(price_map[key]) / len(price_map[key])
+            total_est_value += (avg_price * i_count)
+        else:
+            pass
+
+    return int(total_est_value)
+
+# --ROUTES ---
 @app.route("/")
 @app.route("/home")
 def home():
@@ -163,8 +298,20 @@ def home():
 
 @app.route("/events/<int:event_id>")
 def events(event_id):
-    data = events_collection.find({'EventId': event_id})
-    return render_template('events.html', events=data)
+    data = list(events_collection.find({'EventId': event_id}))
+    if not data:
+        details = fetch_event_details(event_id)
+        if details:
+            data = [details]
+    estimated_loss = 0
+    if data:
+        estimated_loss = calculate_estimated_loss(data[0]['Victim'])
+    return render_template('events.html', events=data, estimated_loss=estimated_loss)
+
+@app.route("/player/<player_id>")
+def player(player_id):
+    data = get_player_data(player_id)
+    return render_template('player.html', **data)
 
 @app.route('/api/updates')
 def api_updates():

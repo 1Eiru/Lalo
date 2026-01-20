@@ -36,8 +36,18 @@
                             {{ data.TimeStamp.strftime('%Y-%m-%d %H:%M:%S') }}
                         {% endif %}
                     </td>
-                    <td>{{ data.Killer.Name }}</td>
-                    <td>{{ data.Victim.Name }}</td>
+                    <!-- Killer Column with Blue Hover -->
+                    <td>
+                        <a href="{{ url_for('player', player_id=data.Killer.Id) }}" class="killer-link">
+                            {{ data.Killer.Name }}
+                        </a>
+                    </td>
+                    <!-- Victim Column with Red Hover -->
+                    <td>
+                        <a href="{{ url_for('player', player_id=data.Victim.Id) }}" class="victim-link">
+                            {{ data.Victim.Name }}
+                        </a>
+                    </td>
                 </tr>
             {% endfor %}
         </tbody>
@@ -51,7 +61,6 @@
     // Initialize target from server render
     let targetTimestamp = Number("{{ next_update_ts | default('0') }}");
     let currentLastUpdateTime = "{{ last_update }}";
-    
     const timerDisplay = document.getElementById('countdownTimer');
     const lastUpdateDisplay = document.getElementById('lastUpdateDisplay');
     let isFetching = false;
@@ -79,10 +88,8 @@
     function checkForUpdates() {
         isFetching = true;
         console.log("Fetching updates...");
-
         $.getJSON("/api/updates", function(data) {
             targetTimestamp = data.next_update_ts;
-
             const now = Math.floor(Date.now() / 1000);
             if (targetTimestamp <= now) {
                 console.log("Server schedule pending. Waiting 5s...");
@@ -97,7 +104,6 @@
             isFetching = false;
         }).fail(function() {
             console.log("Server error. Retrying in 10s...");
-            // On error, wait 10 seconds
             targetTimestamp = Math.floor(Date.now() / 1000) + 10;
             isFetching = false;
         });
@@ -110,14 +116,27 @@
             var row = $("<tr>");
             row.append($("<td>").text(index + 1));
             
-            var link = $("<a>")
+            var eventLink = $("<a>")
                 .attr("href", "/events/" + event.EventId)
                 .text(event.EventId);
-            row.append($("<td>").append(link));
+            row.append($("<td>").append(eventLink));
             
             row.append($("<td>").text(event.TimeStamp));
-            row.append($("<td>").text(event.KillerName));
-            row.append($("<td>").text(event.VictimName));
+
+            // Killer Link (Blue Hover)
+            var killerLink = $("<a>")
+                .attr("href", "/player/" + event.KillerId)
+                .addClass("killer-link") 
+                .text(event.KillerName);
+            row.append($("<td>").append(killerLink));
+
+            // Victim Link (Red Hover)
+            var victimLink = $("<a>")
+                .attr("href", "/player/" + event.VictimId)
+                .addClass("victim-link")
+                .text(event.VictimName);
+            row.append($("<td>").append(victimLink));
+
             tableBody.append(row);
         });
     }

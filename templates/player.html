@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+    <!-- Player Header Info -->
+    <div class="card shadow mb-4">
+        <div class="card-body text-center">
+            <!--Image -->
+            <h2 class="card-title d-flex justify-content-center align-items-center gap-2">
+                <img src="{{ url_for('static', filename='/FeelsDankMan.PNG') }}" 
+                     alt="icon" 
+                     style="height: 1.2em; width: auto;">
+                {{ player.Name }}
+            </h2>
+            
+            <h5 class="text-muted">Guild: {{ player.GuildName }}</h5>
+            <div class="row mt-3 justify-content-center">
+                <div class="col-md-3">
+                    <div class="p-2 border rounded bg-light">
+                        <strong>Kill Fame 😍</strong><br>
+                        {{ "{:,}".format(player.KillFame) }}
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="p-2 border rounded bg-light">
+                        <strong>Death Fame 😭</strong><br>
+                        {{ "{:,}".format(player.DeathFame) }}
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="p-2 border rounded bg-light">
+                        <strong>Fame Ratio ⚖️</strong><br>
+                        {{ "{:,}".format(player.FameRatio) }}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!--STATISTICS-->
+    {% if player.LifetimeStatistics %}
+    <div class="card shadow mb-4">
+        <div class="card-header bg-secondary text-white">
+            <h5 class="mb-0">Lifetime Statistics</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <!-- PvE Column -->
+                <div class="col-md-4 mb-3">
+                    <h6 class="text-primary border-bottom pb-2">⚔️ PvE Fame</h6>
+                    <ul class="list-group list-group-flush small">
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Total <span class="badge bg-primary rounded-pill">{{ "{:,}".format(player.LifetimeStatistics.PvE.Total) }}</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Royal <span class="text-muted">{{ "{:,}".format(player.LifetimeStatistics.PvE.Royal) }}</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Outlands <span class="text-muted">{{ "{:,}".format(player.LifetimeStatistics.PvE.Outlands) }}</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Avalon <span class="text-muted">{{ "{:,}".format(player.LifetimeStatistics.PvE.Avalon) }}</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Hellgate <span class="text-muted">{{ "{:,}".format(player.LifetimeStatistics.PvE.Hellgate) }}</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Mists <span class="text-muted">{{ "{:,}".format(player.LifetimeStatistics.PvE.Mists) }}</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Gathering Column -->
+                <div class="col-md-4 mb-3">
+                    <h6 class="text-success border-bottom pb-2">⛏️ Gathering Fame</h6>
+                    <ul class="list-group list-group-flush small">
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <strong>All</strong> <span class="badge bg-success rounded-pill">{{ "{:,}".format(player.LifetimeStatistics.Gathering.All.Total) }}</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Fiber <span class="text-muted">{{ "{:,}".format(player.LifetimeStatistics.Gathering.Fiber.Total) }}</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Hide <span class="text-muted">{{ "{:,}".format(player.LifetimeStatistics.Gathering.Hide.Total) }}</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Ore <span class="text-muted">{{ "{:,}".format(player.LifetimeStatistics.Gathering.Ore.Total) }}</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Wood <span class="text-muted">{{ "{:,}".format(player.LifetimeStatistics.Gathering.Wood.Total) }}</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Rock <span class="text-muted">{{ "{:,}".format(player.LifetimeStatistics.Gathering.Rock.Total) }}</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Other Stats Column -->
+                <div class="col-md-4 mb-3">
+                    <h6 class="text-warning border-bottom pb-2">🔨 Other Activities</h6>
+                    <ul class="list-group list-group-flush small">
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Crafting <span class="badge bg-warning text-dark rounded-pill">{{ "{:,}".format(player.LifetimeStatistics.Crafting.Total) }}</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Fishing <span class="text-muted">{{ "{:,}".format(player.LifetimeStatistics.FishingFame) }}</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Farming <span class="text-muted">{{ "{:,}".format(player.LifetimeStatistics.FarmingFame) }}</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Crystal League <span class="text-muted">{{ "{:,}".format(player.LifetimeStatistics.CrystalLeague) }}</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="row">
+        <!-- KILLS COLUMN (BLUE) -->
+        <div class="col-md-6 mb-4">
+            <h4 class="text-primary border-bottom pb-2">Recent Kills ({{ kills|length }})</h4>
+            {% if kills %}
+                <div class="list-group">
+                {% for kill in kills %}
+                    <a href="{{ url_for('events', event_id=kill.EventId) }}" class="list-group-item list-group-item-action border-primary mb-1 shadow-sm" style="border-left: 5px solid blue;">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h5 class="mb-1 text-primary">Killed: {{ kill.Victim.Name }}</h5>
+                            <small>{{ kill.TimeStamp[:10] }}</small>
+                        </div>
+                        <p class="mb-1">Fame: {{ "{:,}".format(kill.TotalVictimKillFame) }}</p>
+                        <small class="text-muted">Guild: {{ kill.Victim.GuildName }}</small>
+                    </a>
+                {% endfor %}
+                </div>
+            {% else %}
+                <p class="text-muted">No recent kills found.</p>
+            {% endif %}
+        </div>
+
+        <!-- DEATHS COLUMN (RED) -->
+        <div class="col-md-6 mb-4">
+            <h4 class="text-danger border-bottom pb-2">Recent Deaths ({{ deaths|length }})</h4>
+            {% if deaths %}
+                <div class="list-group">
+                {% for death in deaths %}
+                    <a href="{{ url_for('events', event_id=death.EventId) }}" class="list-group-item list-group-item-action border-danger mb-1 shadow-sm" style="border-left: 5px solid red;">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h5 class="mb-1 text-danger">Killed by: {{ death.Killer.Name }}</h5>
+                            <small>{{ death.TimeStamp[:10] }}</small>
+                        </div>
+                        <p class="mb-1">Participants: {{ death.Participants|length }}</p>
+                        <small class="text-muted">Guild: {{ death.Killer.GuildName }}</small>
+                    </a>
+                {% endfor %}
+                </div>
+            {% else %}
+                <p class="text-muted">No recent deaths found.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

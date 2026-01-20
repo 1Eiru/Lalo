@@ -5,9 +5,11 @@
         <!--FIRST COLUMN [KILLER]-->
         {% for event in events %}
         <div class="col-md-6 pe-md-4 mb-4 mb-md-0">
-
-            
-            <h6>Killer 🩸: {{event.Killer.Name}}</h6>
+            <h6>Killer 🩸: 
+                <a href="{{ url_for('player', player_id=event.Killer.Id) }}" class="killer-link">
+                    {{event.Killer.Name}}
+                </a>
+            </h6>
             <h6>Guild 🏰: {{event.Killer.GuildName}}</h6>
             <h6>KillFame 😍: {{event.Killer.KillFame}}</h6>            
             <div class="row row-cols-3 shadow  bg-light">
@@ -88,7 +90,11 @@
                 {% for i in event.Participants %}
                     {% if i.Name != event.Killer.Name %}
                     <div class="row shadow border mb-1"> 
-                        <h6>Name: {{i.Name}}</h6>
+                        <h6>Name: 
+                            <a href="{{ url_for('player', player_id=i.Id) }}" class="text-decoration-none text-dark">
+                                {{i.Name}}
+                            </a>
+                        </h6>
                         <h6>Guild 🏰:{{i.GuildName}}</h6>
                         {% if i.DamageDone != 0 %}
                             <p class="h6">Damage⚔️ :{{i.DamageDone}}</p>
@@ -101,11 +107,13 @@
                 {% endfor %}
 
         </div>
-
-
-        <!--SECOND COLUMN [VICTIM<]-->
+        <!--SECOND COLUMN [VICTIM]-->
         <div class="col-md-6 ps-md-4">
-            <h6>Victim💀: {{event.Victim.Name}}</h6>
+            <h6>Victim💀: 
+                <a href="{{ url_for('player', player_id=event.Victim.Id) }}" class="victim-link">
+                    {{event.Victim.Name}}
+                </a>
+            </h6>
             <h6>Guild 🏰: {{event.Victim.GuildName}}</h6>
             <h6>DeathFame 😭: {{event.Victim.DeathFame}}</h6>
             <div class="row row-cols-3 shadow bg-light">
@@ -185,8 +193,11 @@
                 </div>
             </div>
             <hr>
-            <!-- INVENTORY VINCTIM -->
-            <h6> Inventory </h6>
+            <!-- INVENTORY VICTIM -->
+            <h6 class="d-flex justify-content-between align-items-center">
+                <span>Inventory</span>
+                <span class="text-danger">Total Estimated Loss 💰 (Gear + Inventory) > {{ "{:,}".format(estimated_loss) }} 🤣</span>
+            </h6>
             <div class="container border shadow">
                 <div class="row">
                     {% for i in event.Victim.Inventory %}
