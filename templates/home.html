@@ -1,64 +1,86 @@
 {% extends "base.html" %}
-{% block content %}
-<div class="row justify-content-center">
-    <div class="text-center mb-3">
-        <p class="h5">Last update: <span id="lastUpdateDisplay">{{ last_update }}</span></p>
-        <!-- Timer Display -->
-        <p class="text-muted small">
-            Next server check in: 
-            <span id="countdownTimer" class="fw-bold text-primary">--</span> seconds
-        </p>
-    </div>
+{% block head %}
+<style>
+    @media (max-width: 768px) {
+        .table-mobile-compact td, 
+        .table-mobile-compact th {
+            padding: 0.25rem 0.5rem; 
+            font-size: 0.85rem;      
+            white-space: nowrap;     
+        }
+        .table-responsive {
+            -webkit-overflow-scrolling: touch;
+        }
+    }
+</style>
 
-    <table id="eventsTable" class="table table-responsive w-50 shadow">
-        <thead>
-            <tr>
-                <th>#</th>
-                <th>Event</th>
-                <th>Time</th>
-                <th>Killer</th>
-                <th>Victim</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for data in datas %}
-                <tr>
-                    <td>{{ loop.index }}</td>
-                    <td>
-                        <a href="{{ url_for('events', event_id=data.EventId) }}">
-                            {{ data.EventId }}
-                        </a>
-                    </td>
-                    <td>
-                        {% if data.TimeStamp is string %}
-                            {{ data.TimeStamp }}
-                        {% else %}
-                            {{ data.TimeStamp.strftime('%Y-%m-%d %H:%M:%S') }}
-                        {% endif %}
-                    </td>
-                    <!-- Killer Column with Blue Hover -->
-                    <td>
-                        <a href="{{ url_for('player', player_id=data.Killer.Id) }}" class="killer-link">
-                            {{ data.Killer.Name }}
-                        </a>
-                    </td>
-                    <!-- Victim Column with Red Hover -->
-                    <td>
-                        <a href="{{ url_for('player', player_id=data.Victim.Id) }}" class="victim-link">
-                            {{ data.Victim.Name }}
-                        </a>
-                    </td>
-                </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</div>
 {% endblock %}
+{% block content %}
 
+<div class="container-fluid mt-3">
+    <div class="row justify-content-center">
+        <div class="col-12 col-lg-8">
+            
+            <div class="text-center mb-3">
+                <p class="h5">Last update: <span id="lastUpdateDisplay">{{ last_update }}</span></p>
+                <p class="text-muted small">
+                    Next server check in: 
+                    <span id="countdownTimer" class="fw-bold text-primary">--</span> seconds
+                </p>
+            </div>
+            <div class="table-responsive shadow rounded">
+                <table id="eventsTable" class="table table-hover table-mobile-compact mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>#</th>
+                            <th>Event</th>
+                            <th>Time</th>
+                            <th>Killer</th>
+                            <th>Victim</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for data in datas %}
+                            <tr>
+                                <td>{{ loop.index }}</td>
+                                <td>
+                                    <a href="{{ url_for('events', event_id=data.EventId) }}">
+                                        {{ data.EventId }}
+                                    </a>
+                                </td>
+                                <td>
+                                    {% if data.TimeStamp is string %}
+                                        {{ data.TimeStamp }}
+                                    {% else %}
+                                        {{ data.TimeStamp.strftime('%Y-%m-%d %H:%M:%S') }}
+                                    {% endif %}
+                                </td>
+                                <!-- Killer Column with Blue Hover -->
+                                <td>
+                                    <a href="{{ url_for('player', player_id=data.Killer.Id) }}" class="killer-link">
+                                        {{ data.Killer.Name }}
+                                    </a>
+                                </td>
+                                <!-- Victim Column with Red Hover -->
+                                <td>
+                                    <a href="{{ url_for('player', player_id=data.Victim.Id) }}" class="victim-link">
+                                        {{ data.Victim.Name }}
+                                    </a>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
 {% block scripts %}
+
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script>
-    // Initialize target from server render
     let targetTimestamp = Number("{{ next_update_ts | default('0') }}");
     let currentLastUpdateTime = "{{ last_update }}";
     const timerDisplay = document.getElementById('countdownTimer');
@@ -84,7 +106,7 @@
             }
         }, 1000);
     }
-
+    
     function checkForUpdates() {
         isFetching = true;
         console.log("Fetching updates...");
