@@ -70,24 +70,65 @@
         .search-result-item:hover {
             background-color: #f8f9fa;
         }
+
+        .nav-pill-custom {
+            display: inline-block;
+            padding: 5px 20px;
+            border-radius: 50px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.95rem;
+            transition: all 0.2s ease;
+        }
+        
+        .pill-blue {
+            background-color: #e7f1ff;
+            color: #0d6efd;
+            border: 1px solid transparent;
+        }
+        .pill-blue:hover {
+            background-color: #0d6efd;
+            color: white;
+        }
+        .pill-red {
+            background-color: #ffe7e7;
+            color: #dc3545;
+            border: 1px solid transparent;
+        }
+        .pill-red:hover {
+            background-color: #dc3545;
+            color: white;
+        }
     </style>
     {% block head %}{% endblock %}
 </head>
 <body>
     <div class="container mt-3">
-        <!-- HEADER WITH SEARCH BAR -->
-        <div class="d-flex flex-wrap justify-content-between align-items-center border-bottom pb-3 mb-3 gap-3">
-            <h1 class="mb-0">
-                <a href="{{url_for('home')}}" style="text-decoration: none; color: #0d6efd;">
-                    AO Killboard
-                </a>
-            </h1>
-            <!-- SEARCH INPUT -->
+        <!-- HEADER -->
+        <div class="d-flex flex-wrap justify-content-between align-items-end border-bottom pb-3 mb-3 gap-3">
+            <div>
+                <h1 class="mb-2">
+                    <a href="{{url_for('home')}}" style="text-decoration: none; color: #000000;">
+                        AO Killboard
+                    </a>
+                </h1>
+                <div class="d-flex gap-2">
+                    <a href="{{url_for('home')}}" class="nav-pill-custom pill-blue">
+                        Recent Kills
+                    </a>
+                    <a href="{{url_for('battles')}}" class="nav-pill-custom pill-red">
+                        Recent Battles
+                    </a>
+                </div>
+            </div>
+
+            <!-- RIGHT: SEARCH INPUT -->
             <div class="search-container">
                 <input type="text" id="playerSearch" class="form-control" placeholder="Search Player (IGN)..." autocomplete="off">
                 <div id="searchResults" class="list-group shadow"></div>
             </div>
         </div>
+
     </div>
     {% block content %}{% endblock %}
 

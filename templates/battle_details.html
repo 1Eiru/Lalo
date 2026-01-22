@@ -1,0 +1,514 @@
+{% extends "base.html" %}
+{% block head %}
+<style>
+    @media (max-width: 768px) {
+        .table-mobile-compact td, 
+        .table-mobile-compact th {
+            padding: 0.25rem 0.5rem; 
+            font-size: 0.85rem;      
+            white-space: nowrap;     
+        }
+    }
+    .sort-link {
+        color: inherit;
+        text-decoration: none;
+        display: block;
+        width: 100%;
+        cursor: pointer;
+        white-space: nowrap;
+    }
+    .sort-link:hover {
+        color: #0d6efd;
+        background-color: rgba(0,0,0,0.02);
+    }
+    .kill-count-btn {
+        cursor: pointer;
+        text-decoration: underline;
+    }
+    .kill-count-btn:hover {
+        background-color: #0b5ed7 !important;
+        color: white;
+    }
+    .mini-grid-item {
+        height: 60px;
+        width: 60px;
+        background-color: rgba(0,0,0,0.05);
+        border-radius: 4px;
+        position: relative;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin: 2px;
+    }
+    .mini-item-count {
+        position: absolute;
+        bottom: 0;
+        right: 0;
+        background: rgba(0,0,0,0.7);
+        color: white;
+        font-size: 10px;
+        padding: 0 3px;
+    }
+    .mini-grid-item img {
+        max-width: 100%;
+        max-height: 100%;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="container mt-4">
+    <!-- Battle Header Info -->
+    <div class="card shadow mb-4">
+        <div class="card-body text-center">
+            <h2 class="card-title d-flex justify-content-center align-items-center gap-2">
+                <img src="{{ url_for('static', filename='/FeelsDankMan.png') }}" 
+                     alt="icon" 
+                     style="height: 1.2em; width: auto;"
+                     onerror="this.style.display='none'">
+                Battle #{{ battle.id }}
+            </h2>
+            
+            <h5 class="text-muted">
+                {% if battle.endTime is string %}
+                    {{ battle.endTime.replace('T', ' ').split('.')[0] }}
+                {% else %}
+                    {{ battle.endTime.strftime('%Y-%m-%d %H:%M:%S') }}
+                {% endif %}
+            </h5>
+
+            <div class="row mt-3 justify-content-center">
+                <div class="col-md-3">
+                    <div class="p-2 border rounded bg-light">
+                        <strong>Total Fame 💰</strong><br>
+                        {{ "{:,}".format(battle.totalFame) }}
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="p-2 border rounded bg-light">
+                        <strong>Total Kills ⚔️</strong><br>
+                        {{ "{:,}".format(battle.totalKills if battle.totalKills else 0) }}
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="p-2 border rounded bg-light">
+                        <strong>Total Players 👥</strong><br>
+                        {{ battle.totalPlayers }}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Guild Statistics Table -->
+    <div class="card shadow mb-5">
+        <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Guild Statistics</h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover table-mobile-compact mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Guild</th>
+                            <th>Alliance</th>
+                            
+                            {% macro sort_header(label, key, current_s, current_o, param_s='sort', param_o='order') %}
+                                {% set next_order = 'asc' if current_s == key and current_o == 'desc' else 'desc' %}
+                                <th class="text-center">
+                                    <a href="{{ url_for('battle_details', battle_id=battle.id, **{param_s: key, param_o: next_order, 'page': 1, 'p_sort': p_sort, 'p_order': p_order}) }}" class="sort-link preserve-scroll">
+                                        {{ label }}
+                                        {% if current_s == key %}
+                                            {% if current_o == 'desc' %}▼{% else %}▲{% endif %}
+                                        {% endif %}
+                                    </a>
+                                </th>
+                            {% endmacro %}
+
+                            {{ sort_header('Players', 'players', current_sort, current_order) }}
+                            {{ sort_header('Kills', 'kills', current_sort, current_order) }}
+                            {{ sort_header('Deaths', 'deaths', current_sort, current_order) }}
+                            
+                            <th class="text-end">
+                                {% set next_order = 'asc' if current_sort == 'fame' and current_order == 'desc' else 'desc' %}
+                                <a href="{{ url_for('battle_details', battle_id=battle.id, sort='fame', order=next_order, p_sort=p_sort, p_order=p_order) }}" class="sort-link text-end pe-2 preserve-scroll">
+                                    Kill Fame
+                                    {% if current_sort == 'fame' %}
+                                        {% if current_order == 'desc' %}▼{% else %}▲{% endif %}
+                                    {% endif %}
+                                </a>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for guild in guilds %}
+                          <tr>
+                            <td class="fw-normal">{{ guild.name }}</td>
+                            <td>
+                                {% if guild.alliance %}
+                                    <span class="badge bg-secondary fw-normal">{{ guild.alliance }}</span>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                <span class="text-dark fw-normal">{{ guild.playerCount if guild.playerCount else 0 }}</span>
+                            </td>
+                            <td class="text-center fw-normal">{{ guild.kills }}</td>
+                            <td class="text-center fw-normal">{{ guild.deaths }}</td>
+                            <td class="text-end">{{ "{:,}".format(guild.killFame) }}</td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="6" class="text-center">No guild data available.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="card-footer bg-white">
+            <nav aria-label="Guild navigation">
+                <ul class="pagination justify-content-center mb-0">
+                    <li class="page-item {% if page <= 1 %}disabled{% endif %}">
+                        <a class="page-link preserve-scroll" href="{{ url_for('battle_details', battle_id=battle.id, page=page-1, sort=current_sort, order=current_order, p_sort=p_sort, p_order=p_order) }}" tabindex="-1">Previous</a>
+                    </li>
+                    <li class="page-item disabled">
+                        <span class="page-link text-muted">Page {{ page }} of {{ total_pages }}</span>
+                    </li>
+                    <li class="page-item {% if page >= total_pages %}disabled{% endif %}">
+                        <a class="page-link preserve-scroll" href="{{ url_for('battle_details', battle_id=battle.id, page=page+1, sort=current_sort, order=current_order, p_sort=p_sort, p_order=p_order) }}">Next</a>
+                    </li>
+                </ul>
+            </nav>
+        </div>
+    </div>
+
+    <!-- PLAYER STATISTICS SECTION -->
+    <div class="card shadow mb-4">
+        <div class="card-header bg-dark text-white">
+            <h5 class="mb-0">Player Statistics</h5>
+        </div>
+        <div class="card-body p-0">
+            
+            <!-- Filters -->
+            <div class="row g-2 p-3 bg-light border-bottom">
+                <div class="col-md-4">
+                    <select id="guildFilter" class="form-select">
+                        <option value="">All Guilds</option>
+                        {% for g in unique_guilds %}
+                            <option value="{{ g }}">{{ g }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <select id="allianceFilter" class="form-select">
+                        <option value="">All Alliances</option>
+                        {% for a in unique_alliances %}
+                            <option value="{{ a }}">{{ a }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <input type="text" id="playerFilter" class="form-control" placeholder="Search Player Name...">
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table id="playersTable" class="table table-hover table-mobile-compact mb-0">
+                    <thead class="table-light sticky-top" style="z-index: 5;">
+                        <tr>
+                            <th>Name</th>
+                            <th>Guild</th>
+                            
+                            {% macro p_sort_header(label, key) %}
+                                {% set next_order = 'asc' if p_sort == key and p_order == 'desc' else 'desc' %}
+                                <th class="text-center">
+                                    <a href="{{ url_for('battle_details', battle_id=battle.id, p_sort=key, p_order=next_order, sort=current_sort, order=current_order, page=page) }}" class="sort-link preserve-scroll">
+                                        {{ label }}
+                                        {% if p_sort == key %}
+                                            {% if p_order == 'desc' %}▼{% else %}▲{% endif %}
+                                        {% endif %}
+                                    </a>
+                                </th>
+                            {% endmacro %}
+
+                            {{ p_sort_header('IP', 'ip') }}
+                            {{ p_sort_header('Damage', 'damage') }}
+                            {{ p_sort_header('Heal', 'healing') }}
+                            {{ p_sort_header('Kills', 'kills') }}
+                            {{ p_sort_header('Deaths', 'deaths') }}
+
+                            <th class="text-end">
+                                {% set next_order = 'asc' if p_sort == 'fame' and p_order == 'desc' else 'desc' %}
+                                <a href="{{ url_for('battle_details', battle_id=battle.id, p_sort='fame', p_order=next_order, sort=current_sort, order=current_order, page=page) }}" class="sort-link text-end pe-2 preserve-scroll">
+                                    Fame
+                                    {% if p_sort == 'fame' %}
+                                        {% if p_order == 'desc' %}▼{% else %}▲{% endif %}
+                                    {% endif %}
+                                </a>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for p in player_stats %}
+                        <tr class="player-row" data-guild="{{ p.GuildName }}" data-alliance="{{ p.AllianceName }}">
+                            <td>
+                                <a href="{{ url_for('player', player_id=p.Id) }}" class="text-decoration-none text-dark">
+                                    {{ p.Name }}
+                                </a>
+                                <div class="small text-muted d-md-none">{{ p.GuildName }}</div>
+                            </td>
+                            <td class="d-none d-md-table-cell">
+                                {{ p.GuildName }}
+                                {% if p.AllianceName %}
+                                    <br><small class="text-muted">[{{ p.AllianceName }}]</small>
+                                {% endif %}
+                            </td>
+                            
+                            <!-- Item Power -->
+                            <td class="text-center">{{ p.IP }}</td>
+                            
+                            <!-- Damage -->
+                            <td class="text-center">
+                                {% if p.Damage > 0 %}
+                                    <span class="text-danger">{{ "{:,}".format(p.Damage) }}</span>
+                                {% else %}
+                                    <span class="text-danger">0</span>
+                                {% endif %}
+                            </td>
+
+                            <!-- Heal -->
+                            <td class="text-center">
+                                {% if p.Healing > 0 %}
+                                    <span class="text-success">{{ "{:,}".format(p.Healing) }}</span>
+                                {% else %}
+                                    <span class="text-success">0</span>
+                                {% endif %}
+                            </td>
+
+                            <!-- Kills -->
+                            <td class="text-center">
+                                {% if p.Kills|length > 0 %}
+                                    <span class="badge bg-primary kill-count-btn" 
+                                          data-player-id="{{ p.Id }}">
+                                        {{ p.Kills|length }}
+                                    </span>
+                                {% else %}
+                                    <span class="badge bg-primary text-normal">0</span>
+                                {% endif %}
+                            </td>
+
+                            <!-- Deaths -->
+                            <td class="text-center">
+                                {% if p.Deaths > 0 %}
+                                    <span class="badge text-normal bg-danger">{{ p.Deaths }}</span>
+                                {% else %}
+                                    <span class="badge text-normal bg-danger">0</span>
+                                {% endif %}
+                            </td>
+
+                            <!-- Fame -->
+                            <td class="text-end"><span class="badge bg-warning text-normal">{{ "{:,}".format(p.KillFame) }}</span></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="killsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">Kills by <span id="modalKillerName"></span></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="killsModalBody">
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script id="battle-data-json" type="application/json">
+    {{ player_stats | tojson | safe }}
+</script>
+<script>
+    const battleData = JSON.parse(document.getElementById('battle-data-json').textContent);
+
+    $(document).ready(function() {
+        var scrollPos = sessionStorage.getItem('battleScrollPos');
+        if (scrollPos) {
+            $(window).scrollTop(scrollPos);
+            sessionStorage.removeItem('battleScrollPos');
+        }
+
+        $('.preserve-scroll').on('click', function() {
+            sessionStorage.setItem('battleScrollPos', $(window).scrollTop());
+        });
+        var savedGuild = sessionStorage.getItem('battleGuildFilter');
+        var savedAlliance = sessionStorage.getItem('battleAllianceFilter');
+        var savedName = sessionStorage.getItem('battleNameFilter');
+
+        if (savedGuild) $('#guildFilter').val(savedGuild);
+        if (savedAlliance) $('#allianceFilter').val(savedAlliance);
+        if (savedName) $('#playerFilter').val(savedName);
+
+        function filterPlayers() {
+            var guildVal = $('#guildFilter').val().toLowerCase();
+            var allianceVal = $('#allianceFilter').val().toLowerCase();
+            var nameVal = $('#playerFilter').val().toLowerCase();
+
+            sessionStorage.setItem('battleGuildFilter', $('#guildFilter').val());
+            sessionStorage.setItem('battleAllianceFilter', $('#allianceFilter').val());
+            sessionStorage.setItem('battleNameFilter', $('#playerFilter').val());
+
+            $('#playersTable tbody tr').each(function() {
+                var row = $(this);
+                var g = (row.data('guild') || "").toLowerCase();
+                var a = (row.data('alliance') || "").toLowerCase();
+                var n = row.find('td:first').text().trim().toLowerCase();
+
+                var show = true;
+                if (guildVal && g !== guildVal) show = false;
+                if (allianceVal && a !== allianceVal) show = false;
+                if (nameVal && !n.includes(nameVal)) show = false;
+
+                row.toggle(show);
+            });
+        }
+
+        filterPlayers();
+
+        $('#guildFilter, #allianceFilter').change(filterPlayers);
+        $('#playerFilter').on('keyup', filterPlayers);
+
+        var currentKillsData = [];
+
+        $(document).on('click', '.kill-count-btn', function() {
+            var pid = $(this).data('player-id');
+            
+            var player = battleData.find(p => p.Id === pid);
+            
+            if (player && player.Kills) {
+                currentKillsData = player.Kills;
+                $('#modalKillerName').text(player.Name);
+                renderVictimList();
+                
+                var myModal = new bootstrap.Modal(document.getElementById('killsModal'));
+                myModal.show();
+            }
+        });
+
+        function renderVictimList() {
+            var html = '<div class="list-group">';
+            currentKillsData.forEach(function(event, index) {
+                var v = event.Victim;
+                html += `
+                    <a href="#" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center victim-item" data-index="${index}">
+                        <div>
+                            <span class="fw-bold text-danger">${v.Name}</span>
+                            <small class="text-muted">(${v.GuildName})</small>
+                        </div>
+                        <span class="badge bg-secondary">${Number(event.TotalVictimKillFame).toLocaleString()} Fame</span>
+                    </a>
+                `;
+            });
+            html += '</div>';
+            $('#killsModalBody').html(html);
+
+            $('.victim-item').click(function(e) {
+                e.preventDefault();
+                var idx = $(this).data('index');
+                renderEventDetail(currentKillsData[idx]);
+            });
+        }
+
+        function renderEventDetail(event) {
+            var k = event.Killer;
+            var v = event.Victim;
+            
+            function itemHtml(item, color) {
+                if (!item) return `<div class="mini-grid-item" style="background-color:${color}"></div>`;
+                return `
+                    <div class="mini-grid-item" style="background-color:${color}">
+                        <img src="https://render.albiononline.com/v1/item/${item.Type}.png?count=1&quality=${item.Quality}">
+                        <span class="mini-item-count">${item.Count > 1 ? item.Count : ''}</span>
+                    </div>
+                `;
+            }
+
+            function buildGearGrid(equip, color) {
+                if (!equip) return '<div class="text-muted small">No Gear</div>';
+                return `
+                    <div class="d-flex flex-wrap justify-content-center" style="width: 200px; margin: 0 auto;">
+                        ${itemHtml(equip.Bag, color)}
+                        ${itemHtml(equip.Head, color)}
+                        ${itemHtml(equip.Cape, color)}
+                        ${itemHtml(equip.MainHand, color)}
+                        ${itemHtml(equip.Armor, color)}
+                        ${itemHtml(equip.OffHand, color)}
+                        ${itemHtml(equip.Potion, color)}
+                        ${itemHtml(equip.Shoes, color)}
+                        ${itemHtml(equip.Food, color)}
+                        ${itemHtml(equip.Mount, color)}
+                    </div>
+                `;
+            }
+
+            var html = `
+                <button class="btn btn-sm btn-outline-secondary mb-3" id="backToVictims">&larr; Back to List</button>
+                <div class="row">
+                    <div class="col-6 text-center border-end">
+                        <h6 class="text-primary">${k.Name}</h6>
+                        <small>${k.GuildName}</small>
+                        <div class="mt-2">
+                            ${buildGearGrid(k.Equipment, 'hsla(145, 100%, 50%, 0.2)')}
+                        </div>
+                    </div>
+                    <div class="col-6 text-center">
+                        <h6 class="text-danger">${v.Name}</h6>
+                        <small>${v.GuildName}</small>
+                        <div class="mt-2">
+                            ${buildGearGrid(v.Equipment, 'hsla(0, 80%, 43%, 0.2)')}
+                        </div>
+                    </div>
+                </div>
+                <hr>
+                <h6 class="text-center">Victim Inventory</h6>
+                <div class="d-flex flex-wrap justify-content-center">
+            `;
+
+            if (v.Inventory) {
+                v.Inventory.forEach(function(item) {
+                    if (item) {
+                        html += `
+                            <div class="mini-grid-item bg-light border">
+                                <img src="https://render.albiononline.com/v1/item/${item.Type}.png?count=1&quality=${item.Quality}">
+                                <span class="mini-item-count">${item.Count}</span>
+                            </div>
+                        `;
+                    }
+                });
+            } else {
+                html += '<p class="text-muted small">Empty Inventory</p>';
+            }
+            html += '</div>';
+
+            $('#killsModalBody').html(html);
+
+            $('#backToVictims').click(function() {
+                renderVictimList();
+            });
+        }
+    });
+</script>
+{% endblock %}
