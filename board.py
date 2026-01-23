@@ -26,18 +26,6 @@ battles_collection.create_index([("endTime", DESCENDING)])
 cache_collection.create_index([("last_updated", ASCENDING)], expireAfterSeconds=300)
 battles_cache.create_index([("createdAt", ASCENDING)], expireAfterSeconds=3600)
 
-last_fetched_ids = set()
-
-def load_existing_ids():
-    global last_fetched_ids
-    try:
-        existing = events_collection.find({}, {'EventId': 1})
-        last_fetched_ids = set(doc['EventId'] for doc in existing)
-        print(f"Loaded {len(last_fetched_ids)} existing events from DB.")
-    except Exception as e:
-        print(f"Error loading existing IDs: {e}")
-
-load_existing_ids()
 
 def get_scheduler_status(key='scheduler_status'):
     status = settings_collection.find_one({'_id': key})
@@ -48,7 +36,7 @@ def get_scheduler_status(key='scheduler_status'):
 # --- EVENTS LOGIC ---
 def fetch_event_ids():
     try:
-        response = requests.get('https://gameinfo-sgp.albiononline.com/api/gameinfo/events', params={'offset': 0})
+        response = requests.get('https://gameinfo-sgp.albiononline.com/api/gameinfo/events', params={'offset': 0, 'limit': 50})
         if response.status_code == 200:
             data = response.json()
             return set(event['EventId'] for event in data)
@@ -66,10 +54,14 @@ def fetch_event_details(event_id):
     return None
 
 def fetch_and_check_events():
-    global last_fetched_ids
-    current_ids = fetch_event_ids()
-    if not current_ids: return
-    new_ids = current_ids - last_fetched_ids
+    api_ids = fetch_event_ids()
+    if not api_ids: return
+    existing_cursor = events_collection.find(
+        {'EventId': {'$in': list(api_ids)}},
+        {'EventId': 1}
+    )
+    existing_ids = set(doc['EventId'] for doc in existing_cursor)
+    new_ids = api_ids - existing_ids
 
     if new_ids:
         print(f"Found {len(new_ids)} new events. Fetching details...")
@@ -80,15 +72,14 @@ def fetch_and_check_events():
                     try:
                         dt_object = datetime.fromisoformat(event_details['TimeStamp'].replace('Z', '+00:00'))
                     except ValueError:
-                        dt_object = datetime.now()
-                    event_details['CreatedAt'] = dt_object
+                        dt_object = datetime.now(timezone.utc)
+                    event_details['CreatedAt'] = datetime.now(timezone.utc)
 
                     events_collection.update_one(
                         {'EventId': event_details['EventId']},
                         {'$set': event_details},
                         upsert=True,
                     )
-                    last_fetched_ids.add(event_id)
                 except Exception as e:
                     print(f"DB Error: {e}")
         print("Update complete.")
@@ -288,8 +279,10 @@ def get_latest_events():
     for event in datas:
         try:
             timestamp = datetime.fromisoformat(event['TimeStamp'].replace('Z', '+00:00'))
-        except (ValueError, TypeError):
+        except ValueError:
             timestamp = event['TimeStamp']
+
+        # FIX: Explicitly select fields to avoid including ObjectId (_id)
         processed_event = {
             'EventId': event['EventId'],
             'TimeStamp': timestamp.strftime('%Y-%m-%d %H:%M:%S') if isinstance(timestamp, datetime) else str(timestamp),

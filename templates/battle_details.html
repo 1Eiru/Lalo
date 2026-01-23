@@ -220,7 +220,7 @@
                     <thead class="table-light sticky-top" style="z-index: 5;">
                         <tr>
                             <th>Name</th>
-                            <th>Guild</th>
+                            <th class="d-none d-md-table-cell">Guild</th>
                             
                             {% macro p_sort_header(label, key) %}
                                 {% set next_order = 'asc' if p_sort == key and p_order == 'desc' else 'desc' %}
