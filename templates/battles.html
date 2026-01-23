@@ -128,8 +128,11 @@
     
     const timerDisplay = document.getElementById('countdownTimer');
     const lastUpdateDisplay = document.getElementById('lastUpdateDisplay');
+    
+    // Request Management
     let isFetching = false;
     let searchTimeout;
+    let currentXhr = null; // Store the active AJAX request
 
     function startSyncTimer() {
         setInterval(() => {
@@ -146,7 +149,7 @@
                     if(currentPage === 1 && currentSearch === "") {
                         checkForUpdates(true);
                     } else {
-                        checkForUpdates(false);
+                        checkForUpdates(false); 
                     }
                 }
             }
@@ -155,9 +158,13 @@
     
     function checkForUpdates(shouldUpdateTable) {
         isFetching = true;
+        if (currentXhr) {
+            currentXhr.abort();
+        }
+
         const url = `/api/battles_list?page=${currentPage}&search=${encodeURIComponent(currentSearch)}`;
         
-        $.getJSON(url, function(data) {
+        currentXhr = $.getJSON(url, function(data) {
             targetTimestamp = data.next_update_ts;
             const now = Math.floor(Date.now() / 1000);
             
@@ -166,18 +173,19 @@
             }
 
             if (shouldUpdateTable) {
-                if (data.last_update !== currentLastUpdateTime || data.battles.length !== $("#battlesTable tbody tr").length) {
-                    updateTable(data.battles);
-                    updatePagination(data.current_page, data.total_pages);
-                    lastUpdateDisplay.textContent = data.last_update;
-                    currentLastUpdateTime = data.last_update;
-                }
+                updateTable(data.battles);
+                updatePagination(data.current_page, data.total_pages);
+                lastUpdateDisplay.textContent = data.last_update;
+                currentLastUpdateTime = data.last_update;
             } else {
                 lastUpdateDisplay.textContent = data.last_update; 
             }
             isFetching = false;
-        }).fail(function() {
-            targetTimestamp = Math.floor(Date.now() / 1000) + 10;
+            currentXhr = null;
+        }).fail(function(jqXHR) {
+            if (jqXHR.statusText !== 'abort') {
+                targetTimestamp = Math.floor(Date.now() / 1000) + 10;
+            }
             isFetching = false;
         });
     }
@@ -186,7 +194,7 @@
         var tableBody = $("#battlesTable tbody");
         tableBody.empty();
         
-        if (battles.length === 0) {
+        if (!battles || battles.length === 0) {
             tableBody.append('<tr><td colspan="5" class="text-center py-4">No battles found matching your criteria.</td></tr>');
             return;
         }
@@ -248,6 +256,7 @@
             if (curr > 1) {
                 currentPage = curr - 1;
                 checkForUpdates(true);
+                updateUrl();
             }
         });
         prevLi.append(prevLink);
@@ -267,34 +276,41 @@
             if (curr < total) {
                 currentPage = curr + 1;
                 checkForUpdates(true);
+                updateUrl();
             }
         });
         nextLi.append(nextLink);
         nav.append(nextLi);
     }
 
+    function updateUrl() {
+        const newUrl = new URL(window.location);
+        if (currentSearch) {
+            newUrl.searchParams.set('search', currentSearch);
+        } else {
+            newUrl.searchParams.delete('search');
+        }
+        newUrl.searchParams.set('page', currentPage);
+        window.history.pushState({}, '', newUrl);
+    }
+
     // Search Logic
     function performSearch() {
         currentSearch = $("#battleSearch").val().trim();
-        currentPage = 1;
+        currentPage = 1; 
         checkForUpdates(true);
-        const newUrl = new URL(window.location);
-        newUrl.searchParams.set('search', currentSearch);
-        newUrl.searchParams.set('page', 1);
-        window.history.pushState({}, '', newUrl);
+        updateUrl();
     }
 
     $(document).ready(function() {
         startSyncTimer();
-
-        $("#btnSearch").click(performSearch);
-        
-        $("#battleSearch").on('keyup', function(e) {
-            if (e.key === 'Enter') {
+        $("#btnSearch").click(performSearch);        
+        $("#battleSearch").on('input', function(e) {
+            clearTimeout(searchTimeout);  
+            if ($(this).val().trim() === "") {
                 performSearch();
             } else {
-                clearTimeout(searchTimeout);
-                searchTimeout = setTimeout(performSearch, 600);
+                searchTimeout = setTimeout(performSearch, 500);
             }
         });
     });

@@ -26,7 +26,6 @@ battles_collection.create_index([("endTime", DESCENDING)])
 cache_collection.create_index([("last_updated", ASCENDING)], expireAfterSeconds=300)
 battles_cache.create_index([("createdAt", ASCENDING)], expireAfterSeconds=3600)
 
-
 def get_scheduler_status(key='scheduler_status'):
     status = settings_collection.find_one({'_id': key})
     if not status:
@@ -36,7 +35,9 @@ def get_scheduler_status(key='scheduler_status'):
 # --- EVENTS LOGIC ---
 def fetch_event_ids():
     try:
-        response = requests.get('https://gameinfo-sgp.albiononline.com/api/gameinfo/events', params={'offset': 0, 'limit': 50})
+        response = requests.get('https://gameinfo-sgp.albiononline.com/api/gameinfo/events', 
+                              params={'offset': 0, 'limit': 50}, 
+                              timeout=10)
         if response.status_code == 200:
             data = response.json()
             return set(event['EventId'] for event in data)
@@ -47,7 +48,7 @@ def fetch_event_ids():
     
 def fetch_event_details(event_id):
     try:
-        response = requests.get(f'https://gameinfo-sgp.albiononline.com/api/gameinfo/events/{event_id}')
+        response = requests.get(f'https://gameinfo-sgp.albiononline.com/api/gameinfo/events/{event_id}', timeout=10)
         if response.status_code == 200:
             return response.json()
     except Exception: pass
@@ -85,10 +86,24 @@ def fetch_and_check_events():
         print("Update complete.")
 
 # --- BATTLES LOGIC ---
-def fetch_battles_data():
+def fetch_battles_data(sort_type='recent', time_range='week', limit=50, offset=0):
+    """
+    range: day | week | month
+    limit: 1 - 50 (API usually caps at 50 per request)
+    offset: 0 - 9999
+    sort: totalFame | totalKills | recent
+    """
     try:
-        url = "https://gameinfo-sgp.albiononline.com/api/gameinfo/battles?sort=recent&offset=0&limit=50"
-        response = requests.get(url)
+        base_url = "https://gameinfo-sgp.albiononline.com/api/gameinfo/battles"
+        params = {
+            'range': time_range,
+            'limit': limit,
+            'offset': offset,
+            'sort': sort_type
+        }
+
+        response = requests.get(base_url, params=params, timeout=15)
+        
         if response.status_code == 200:
             battles = response.json()
             count = 0
@@ -98,6 +113,7 @@ def fetch_battles_data():
                         end_time = datetime.fromisoformat(b['endTime'].replace('Z', '+00:00'))
                     except (ValueError, TypeError):
                         end_time = datetime.now()
+                    
                     guild_player_counts = {}
                     players_dict = b.get('players', {})
                     total_players = len(players_dict)
@@ -162,12 +178,12 @@ def fetch_battles_data():
                     count += 1
                 except Exception as e:
                     print(f"Error processing battle {b.get('id')}: {e}")
-            print(f"Processed {count} battles.")
+            print(f"Processed {count} battles (Sort: {sort_type}, Range: {time_range}).")
     except Exception as e:
         print(f"Error fetching battles: {e}")
 
 def fetch_full_battle_history(battle_id):
-    """Loops through offsets to get ALL events for a battle."""
+    """Loops through offsets to get ALL events for a battle with RETRY logic."""
     all_events = []
     offset = 0
     limit = 50
@@ -175,25 +191,40 @@ def fetch_full_battle_history(battle_id):
     print(f"Fetching full history for battle {battle_id}...")
     
     while True:
-        try:
-            url = f"https://gameinfo-sgp.albiononline.com/api/gameinfo/events/battle/{battle_id}"
-            params = {'offset': offset, 'limit': limit}
-            r = requests.get(url, params=params)
-            
-            if r.status_code != 200:
-                print(f"API Error {r.status_code} at offset {offset}")
-                break 
-            data = r.json()
-            if not data:
-                break  
-            all_events.extend(data)
-            if len(data) < limit:
-                break 
-            offset += limit
-            time.sleep(0.1)
-        except Exception as e:
-            print(f"Exception fetching battle events: {e}")
+        success = False
+        for attempt in range(3):
+            try:
+                url = f"https://gameinfo-sgp.albiononline.com/api/gameinfo/events/battle/{battle_id}"
+                params = {'offset': offset, 'limit': limit}
+                r = requests.get(url, params=params, timeout=10)
+                
+                if r.status_code == 200:
+                    data = r.json()
+                    success = True
+                    break 
+                elif r.status_code == 404:
+                    success = True 
+                    data = []
+                    break
+                else:
+                    print(f"API Error {r.status_code} at offset {offset}. Retrying ({attempt+1}/3)...")
+                    time.sleep(1.5)
+            except Exception as e:
+                print(f"Exception fetching battle events: {e}. Retrying ({attempt+1}/3)...")
+                time.sleep(1.5)
+        
+        if not success:
+            print(f"Failed to fetch offset {offset} after retries. Stopping.")
             break
+
+        if not data:
+            break
+            
+        all_events.extend(data)
+        if len(data) < limit:
+            break 
+        offset += limit
+        time.sleep(0.2)
             
     return all_events
 
@@ -206,12 +237,13 @@ def get_battle_details_cached(battle_id):
     events = fetch_full_battle_history(battle_id)
     players_map = {}
     def init_player(p_id, name, guild, alliance, ip=0):
+        p_id = str(p_id)
         if p_id not in players_map:
             players_map[p_id] = {
                 'Id': p_id,
                 'Name': name,
-                'GuildName': guild,
-                'AllianceName': alliance,
+                'GuildName': guild if guild else "",
+                'AllianceName': alliance if alliance else "",
                 'Kills': [],     
                 'Deaths': 0,
                 'KillFame': 0,
@@ -226,23 +258,25 @@ def get_battle_details_cached(battle_id):
         k = e['Killer']
         v = e['Victim']
         parts = e.get('Participants', [])
-        init_player(k['Id'], k['Name'], k['GuildName'], k['AllianceName'], k.get('AverageItemPower', 0))
-        players_map[k['Id']]['Kills'].append(e)
-        players_map[k['Id']]['KillFame'] += e.get('TotalVictimKillFame', 0)
-        init_player(v['Id'], v['Name'], v['GuildName'], v['AllianceName'], v.get('AverageItemPower', 0))
-        players_map[v['Id']]['Deaths'] += 1
+        init_player(k['Id'], k['Name'], k.get('GuildName'), k.get('AllianceName'), k.get('AverageItemPower', 0))
+        players_map[str(k['Id'])]['Kills'].append(e)
+        players_map[str(k['Id'])]['KillFame'] += e.get('TotalVictimKillFame', 0)
+        
+        init_player(v['Id'], v['Name'], v.get('GuildName'), v.get('AllianceName'), v.get('AverageItemPower', 0))
+        players_map[str(v['Id'])]['Deaths'] += 1
 
         for p in parts:
-            init_player(p['Id'], p['Name'], p['GuildName'], p['AllianceName'], p.get('AverageItemPower', 0))
-            players_map[p['Id']]['Damage'] += int(p.get('DamageDone', 0))
-            players_map[p['Id']]['Healing'] += int(p.get('SupportHealingDone', 0))
+            init_player(p['Id'], p['Name'], p.get('GuildName'), p.get('AllianceName'), p.get('AverageItemPower', 0))
+            players_map[str(p['Id'])]['Damage'] += int(p.get('DamageDone', 0))
+            players_map[str(p['Id'])]['Healing'] += int(p.get('SupportHealingDone', 0))
 
     players_list = list(players_map.values())
-    battles_cache.insert_one({
-        'battle_id': battle_id,
-        'createdAt': datetime.now(timezone.utc),
-        'players': players_list
-    })
+    if players_list:
+        battles_cache.update_one(
+            {'battle_id': battle_id},
+            {'$set': {'battle_id': battle_id, 'createdAt': datetime.now(timezone.utc), 'players': players_list}},
+            upsert=True
+        )
     
     return players_list
 
@@ -263,7 +297,8 @@ def scheduled_update_event():
 def scheduled_update_battles():
     with app.app_context():
         print("Scheduler: Battles running...")
-        fetch_battles_data()
+        fetch_battles_data(sort_type='recent', time_range='week', limit=50)
+        
         current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         next_run = time.time() + 90
         settings_collection.update_one(
@@ -282,7 +317,6 @@ def get_latest_events():
         except ValueError:
             timestamp = event['TimeStamp']
 
-        # FIX: Explicitly select fields to avoid including ObjectId (_id)
         processed_event = {
             'EventId': event['EventId'],
             'TimeStamp': timestamp.strftime('%Y-%m-%d %H:%M:%S') if isinstance(timestamp, datetime) else str(timestamp),
@@ -299,15 +333,15 @@ def fetch_player_from_api(player_id):
     kills = []
     deaths = []
     try:
-        r_stats = requests.get(f'https://gameinfo-sgp.albiononline.com/api/gameinfo/players/{player_id}')
+        r_stats = requests.get(f'https://gameinfo-sgp.albiononline.com/api/gameinfo/players/{player_id}', timeout=5)
         if r_stats.status_code == 200: player_info = r_stats.json()
     except Exception: pass
     try:
-        r_kills = requests.get(f'https://gameinfo-sgp.albiononline.com/api/gameinfo/players/{player_id}/kills')
+        r_kills = requests.get(f'https://gameinfo-sgp.albiononline.com/api/gameinfo/players/{player_id}/kills', timeout=5)
         if r_kills.status_code == 200: kills = r_kills.json()
     except Exception: pass
     try:
-        r_deaths = requests.get(f'https://gameinfo-sgp.albiononline.com/api/gameinfo/players/{player_id}/deaths')
+        r_deaths = requests.get(f'https://gameinfo-sgp.albiononline.com/api/gameinfo/players/{player_id}/deaths', timeout=5)
         if r_deaths.status_code == 200: deaths = r_deaths.json()
     except Exception: pass
 
@@ -352,7 +386,7 @@ def calculate_estimated_loss(victim_data):
     item_str = ",".join(items_to_fetch)
     url = f"https://east.albion-online-data.com/api/v2/stats/prices/{item_str}.json?locations={locations}&qualities=1,2,3,4,5"
     try:
-        resp = requests.get(url)
+        resp = requests.get(url, timeout=5)
         if resp.status_code != 200: return 0
         price_data = resp.json()
     except Exception: return 0
@@ -406,107 +440,31 @@ def events(event_id):
     if data: estimated_loss = calculate_estimated_loss(data[0]['Victim'])
     return render_template('events.html', events=data, estimated_loss=estimated_loss)
 
-# --- BATTLES LOGIC ---
-def fetch_battles_data():
-    try:
-        url = "https://gameinfo-sgp.albiononline.com/api/gameinfo/battles?sort=recent&offset=0&limit=50"
-        response = requests.get(url)
-        if response.status_code == 200:
-            battles = response.json()
-            count = 0
-            for b in battles:
-                try:
-                    try:
-                        end_time = datetime.fromisoformat(b['endTime'].replace('Z', '+00:00'))
-                    except (ValueError, TypeError):
-                        end_time = datetime.now()
-
-                    guild_player_counts = {}
-                    players_dict = b.get('players', {})
-                    total_players = len(players_dict)
-                    
-                    searchable_player_names = []
-                    
-                    for p_id, p_data in players_dict.items():
-                        g_id = p_data.get('guildId')
-                        if g_id:
-                            guild_player_counts[g_id] = guild_player_counts.get(g_id, 0) + 1
-                        
-                        if p_data.get('name'):
-                            searchable_player_names.append(p_data['name'])
-
-                    processed_guilds = {}
-                    searchable_guild_names = []
-                    
-                    if 'guilds' in b:
-                        for gid, gdata in b['guilds'].items():
-                            g_name = gdata.get('name')
-                            if g_name:
-                                searchable_guild_names.append(g_name)                     
-                            processed_guilds[gid] = {
-                                'name': g_name,
-                                'kills': gdata.get('kills', 0),
-                                'deaths': gdata.get('deaths', 0),
-                                'killFame': gdata.get('killFame', 0),
-                                'alliance': gdata.get('alliance'),
-                                'allianceId': gdata.get('allianceId'),
-                                'id': gdata.get('id'),
-                                'playerCount': guild_player_counts.get(gid, 0)
-                            }
-
-                    processed_alliances = {}
-                    if 'alliances' in b:
-                        for aid, adata in b['alliances'].items():
-                            processed_alliances[aid] = {
-                                'name': adata.get('name'),
-                                'kills': adata.get('kills', 0),
-                                'deaths': adata.get('deaths', 0),
-                                'killFame': adata.get('killFame', 0),
-                                'id': adata.get('id')
-                            }
-
-                    battle_doc = {
-                        'id': b['id'],
-                        'totalFame': b.get('totalFame', 0),
-                        'totalKills': b.get('totalKills', 0),
-                        'endTime': end_time,
-                        'totalPlayers': total_players,
-                        'guilds': processed_guilds,
-                        'alliances': processed_alliances,
-                        'player_names': searchable_player_names, 
-                        'guild_names': searchable_guild_names
-                    }
-
-                    battles_collection.update_one(
-                        {'id': b['id']},
-                        {'$set': battle_doc},
-                        upsert=True
-                    )
-                    count += 1
-                except Exception as e:
-                    print(f"Error processing battle {b.get('id')}: {e}")
-            print(f"Processed {count} battles.")
-    except Exception as e:
-        print(f"Error fetching battles: {e}")
-
 @app.route("/battles")
 def battles():
     page = request.args.get('page', 1, type=int)
     search_query = request.args.get('search', '').strip()
     per_page = 25
     skip_amount = (page - 1) * per_page
+    
     mongo_query = {}
     if search_query:
         if search_query.isdigit():
-             mongo_query = {'id': int(search_query)}
-        else:
-            regex = {"$regex": search_query, "$options": "i"} 
-            mongo_query = {
+             mongo_query = {
                 "$or": [
-                    {"player_names": regex},
-                    {"guild_names": regex}
+                    {'id': int(search_query)},
+                    {"player_names": {"$regex": search_query, "$options": "i"}},
+                    {"guild_names": {"$regex": search_query, "$options": "i"}}
                 ]
             }
+        else:
+            mongo_query = {
+                "$or": [
+                    {"player_names": {"$regex": search_query, "$options": "i"}},
+                    {"guild_names": {"$regex": search_query, "$options": "i"}}
+                ]
+            }
+            
     total_battles = battles_collection.count_documents(mongo_query)
     total_pages = math.ceil(total_battles / per_page)
     battles_cursor = battles_collection.find(mongo_query).sort("endTime", -1).skip(skip_amount).limit(per_page)
@@ -529,16 +487,23 @@ def api_battles_list():
     mongo_query = {}
     if search_query:
         if search_query.isdigit():
-             mongo_query = {'id': int(search_query)}
+             mongo_query = {
+                "$or": [
+                    {'id': int(search_query)},
+                    {"player_names": {"$regex": search_query, "$options": "i"}},
+                    {"guild_names": {"$regex": search_query, "$options": "i"}}
+                ]
+            }
         else:
-            regex = {"$regex": search_query, "$options": "i"}
             mongo_query = {
                 "$or": [
-                    {"player_names": regex},
-                    {"guild_names": regex}
+                    {"player_names": {"$regex": search_query, "$options": "i"}},
+                    {"guild_names": {"$regex": search_query, "$options": "i"}}
                 ]
             }
 
+    total_battles = battles_collection.count_documents(mongo_query)
+    total_pages = math.ceil(total_battles / per_page)
     battles_cursor = battles_collection.find(mongo_query).sort("endTime", -1).skip(skip_amount).limit(per_page)
     battles_data = []
     
@@ -559,8 +524,6 @@ def api_battles_list():
         })
         
     status = get_scheduler_status('battle_scheduler_status')
-    total_battles = battles_collection.count_documents(mongo_query)
-    total_pages = math.ceil(total_battles / per_page)
 
     return jsonify({
         'battles': battles_data, 
@@ -576,7 +539,7 @@ def battle_details(battle_id):
     if not battle:
         try:
             url = f"https://gameinfo-sgp.albiononline.com/api/gameinfo/battles/{battle_id}"
-            r = requests.get(url)
+            r = requests.get(url, timeout=10)
             if r.status_code == 200: 
                 battle = r.json()
                 if 'players' in battle and 'guilds' in battle:
@@ -609,14 +572,12 @@ def battle_details(battle_id):
     end = start + per_page
     paginated_guilds = guilds_list[start:end]
 
-
     player_stats = get_battle_details_cached(battle_id)
     
     # Player Sort
     p_sort = request.args.get('p_sort', 'fame')
     p_order = request.args.get('p_order', 'desc')
     
-
     p_key_map = {
         'fame': 'KillFame',
         'kills': 'Kills', 
@@ -669,7 +630,7 @@ def search_proxy():
     try:
         url = f"https://gameinfo-sgp.albiononline.com/api/gameinfo/search?q={query}"
         headers = {'User-Agent': 'Mozilla/5.0'} 
-        response = requests.get(url, headers=headers)
+        response = requests.get(url, headers=headers, timeout=5)
         if response.status_code == 200: return jsonify(response.json())     
     except Exception: pass   
     return jsonify({'players': []})

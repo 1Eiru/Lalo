@@ -198,7 +198,9 @@
                     <select id="guildFilter" class="form-select">
                         <option value="">All Guilds</option>
                         {% for g in unique_guilds %}
+                            {% if g %}
                             <option value="{{ g }}">{{ g }}</option>
+                            {% endif %}
                         {% endfor %}
                     </select>
                 </div>
@@ -206,7 +208,9 @@
                     <select id="allianceFilter" class="form-select">
                         <option value="">All Alliances</option>
                         {% for a in unique_alliances %}
+                            {% if a %}
                             <option value="{{ a }}">{{ a }}</option>
+                            {% endif %}
                         {% endfor %}
                     </select>
                 </div>
@@ -253,7 +257,10 @@
                     </thead>
                     <tbody>
                         {% for p in player_stats %}
-                        <tr class="player-row" data-guild="{{ p.GuildName }}" data-alliance="{{ p.AllianceName }}">
+                        <!-- FIX: Ensure data attributes are safe strings -->
+                        <tr class="player-row" 
+                            data-guild="{{ (p.GuildName or '') | string }}" 
+                            data-alliance="{{ (p.AllianceName or '') | string }}">
                             <td>
                                 <a href="{{ url_for('player', player_id=p.Id) }}" class="text-decoration-none text-dark">
                                     {{ p.Name }}
@@ -291,6 +298,7 @@
                             <!-- Kills -->
                             <td class="text-center">
                                 {% if p.Kills|length > 0 %}
+                                    <!-- FIX: Ensure ID is quoted -->
                                     <span class="badge bg-primary kill-count-btn" 
                                           data-player-id="{{ p.Id }}">
                                         {{ p.Kills|length }}
@@ -342,7 +350,13 @@
     {{ player_stats | tojson | safe }}
 </script>
 <script>
-    const battleData = JSON.parse(document.getElementById('battle-data-json').textContent);
+    // Safe JSON parsing
+    let battleData = [];
+    try {
+        battleData = JSON.parse(document.getElementById('battle-data-json').textContent);
+    } catch (e) {
+        console.error("Failed to parse battle data JSON", e);
+    }
 
     $(document).ready(function() {
         var scrollPos = sessionStorage.getItem('battleScrollPos');
@@ -363,9 +377,9 @@
         if (savedName) $('#playerFilter').val(savedName);
 
         function filterPlayers() {
-            var guildVal = $('#guildFilter').val().toLowerCase();
-            var allianceVal = $('#allianceFilter').val().toLowerCase();
-            var nameVal = $('#playerFilter').val().toLowerCase();
+            var guildVal = ($('#guildFilter').val() || "").toLowerCase();
+            var allianceVal = ($('#allianceFilter').val() || "").toLowerCase();
+            var nameVal = ($('#playerFilter').val() || "").toLowerCase();
 
             sessionStorage.setItem('battleGuildFilter', $('#guildFilter').val());
             sessionStorage.setItem('battleAllianceFilter', $('#allianceFilter').val());
@@ -373,8 +387,9 @@
 
             $('#playersTable tbody tr').each(function() {
                 var row = $(this);
-                var g = (row.data('guild') || "").toLowerCase();
-                var a = (row.data('alliance') || "").toLowerCase();
+                // Force string conversion to prevent type errors
+                var g = String(row.data('guild') || "").toLowerCase();
+                var a = String(row.data('alliance') || "").toLowerCase();
                 var n = row.find('td:first').text().trim().toLowerCase();
 
                 var show = true;
@@ -394,9 +409,10 @@
         var currentKillsData = [];
 
         $(document).on('click', '.kill-count-btn', function() {
-            var pid = $(this).data('player-id');
+            var pid = String($(this).data('player-id')); // Force string
             
-            var player = battleData.find(p => p.Id === pid);
+            // Robust find
+            var player = battleData.find(p => String(p.Id) === pid);
             
             if (player && player.Kills) {
                 currentKillsData = player.Kills;
@@ -405,6 +421,8 @@
                 
                 var myModal = new bootstrap.Modal(document.getElementById('killsModal'));
                 myModal.show();
+            } else {
+                console.error("Player data not found for ID:", pid);
             }
         });
 
