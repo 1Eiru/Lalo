@@ -1,11 +1,29 @@
 {% extends "base.html" %}
 {% block head %}
 <style>
+    .table td {
+        font-size: 1.05rem !important; 
+        font-weight: 500 !important;  
+        vertical-align: middle;
+    }
+    .table th {
+        font-size: 1.05rem !important;
+        font-weight: 700 !important; 
+    }
+    .table a {
+        font-weight: 600 !important;
+        text-decoration: none;
+    }
+    .badge {
+        font-size: 0.9em !important; 
+        font-weight: 600 !important;
+    }
+
     @media (max-width: 768px) {
         .table-mobile-compact td, 
         .table-mobile-compact th {
             padding: 0.25rem 0.5rem; 
-            font-size: 0.85rem;      
+            font-size: 0.85rem !important; 
             white-space: nowrap;     
         }
     }
@@ -58,7 +76,7 @@
 
 {% block content %}
 
-<div class="container mt-4">
+<div class="container-fluid mt-4 px-4">
     <!-- Battle Header Info -->
     <div class="card shadow mb-4">
         <div class="card-body text-center">
@@ -91,104 +109,97 @@
                         {{ "{:,}".format(battle.totalKills if battle.totalKills else 0) }}
                     </div>
                 </div>
-                <div class="col-md-3">
-                    <div class="p-2 border rounded bg-light">
-                        <strong>Total Players 👥</strong><br>
-                        {{ battle.totalPlayers }}
+            </div>
+        </div>
+    </div>
+
+    <!-- SPLIT VIEW: ALLIANCES AND GUILDS -->
+    <div class="row">
+        
+        <!-- LEFT COLUMN: ALLIANCE STATISTICS -->
+        <div class="col-xl-6 mb-4">
+            <div class="card shadow h-100">
+                <div class="card-header text-dark d-flex justify-content-between align-items-center" style="background-color: #e9ecef;">
+                    <h5 class="mb-0">Alliances</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover table-mobile-compact mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Alliance</th>
+                                    <th class="text-center">Players</th>
+                                    <th class="text-center">Kills</th>
+                                    <th class="text-center">Deaths</th>
+                                    <th class="text-end">Total Fame</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for ally in alliances %}
+                                <tr>
+                                    <td>
+                                        {% if ally.name %}
+                                            <span class="badge bg-secondary">{{ ally.name }}</span>
+                                        {% else %}
+                                            <span class="text-muted">No Alliance</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="text-dark">{{ ally.playerCount if ally.playerCount else 0 }}</span>
+                                    </td>
+                                    <td class="text-center">{{ ally.kills }}</td>
+                                    <td class="text-center">{{ ally.deaths }}</td>
+                                    <td class="text-end fw-bold">{{ "{:,}".format(ally.killFame) }}</td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="5" class="text-center">No alliance data available.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT COLUMN: GUILD STATISTICS -->
+        <div class="col-xl-6 mb-4">
+            <div class="card shadow h-100">
+                <div class="card-header text-dark d-flex justify-content-between align-items-center" style="background-color: #e9ecef;">
+                    <h5 class="mb-0">Guilds</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover table-mobile-compact mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Guild</th>
+                                    <th class="text-center"><a href="#" onclick="sortGuilds('playerCount'); return false;" class="sort-link">Players <span id="gSortIcon-playerCount"></span></a></th>
+                                    <th class="text-center"><a href="#" onclick="sortGuilds('kills'); return false;" class="sort-link">Kills <span id="gSortIcon-kills"></span></a></th>
+                                    <th class="text-center"><a href="#" onclick="sortGuilds('deaths'); return false;" class="sort-link">Deaths <span id="gSortIcon-deaths"></span></a></th>
+                                    <th class="text-end"><a href="#" onclick="sortGuilds('killFame'); return false;" class="sort-link text-end pe-2">Kill Fame <span id="gSortIcon-killFame">▼</span></a></th>
+                                </tr>
+                            </thead>
+                            <tbody id="guildsTableBody">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="card-footer bg-white">
+                    <nav aria-label="Guild navigation">
+                        <ul class="pagination justify-content-center mb-0 pagination-sm" id="guildsPagination">
+                        </ul>
+                    </nav>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Guild Statistics Table -->
-    <div class="card shadow mb-5">
-        <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
-            <h5 class="mb-0">Guild Statistics</h5>
-        </div>
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-hover table-mobile-compact mb-0">
-                    <thead class="table-light">
-                        <tr>
-                            <th>Guild</th>
-                            <th>Alliance</th>
-                            
-                            {% macro sort_header(label, key, current_s, current_o, param_s='sort', param_o='order') %}
-                                {% set next_order = 'asc' if current_s == key and current_o == 'desc' else 'desc' %}
-                                <th class="text-center">
-                                    <a href="{{ url_for('battle_details', battle_id=battle.id, **{param_s: key, param_o: next_order, 'page': 1, 'p_sort': p_sort, 'p_order': p_order}) }}" class="sort-link preserve-scroll">
-                                        {{ label }}
-                                        {% if current_s == key %}
-                                            {% if current_o == 'desc' %}▼{% else %}▲{% endif %}
-                                        {% endif %}
-                                    </a>
-                                </th>
-                            {% endmacro %}
-
-                            {{ sort_header('Players', 'players', current_sort, current_order) }}
-                            {{ sort_header('Kills', 'kills', current_sort, current_order) }}
-                            {{ sort_header('Deaths', 'deaths', current_sort, current_order) }}
-                            
-                            <th class="text-end">
-                                {% set next_order = 'asc' if current_sort == 'fame' and current_order == 'desc' else 'desc' %}
-                                <a href="{{ url_for('battle_details', battle_id=battle.id, sort='fame', order=next_order, p_sort=p_sort, p_order=p_order) }}" class="sort-link text-end pe-2 preserve-scroll">
-                                    Kill Fame
-                                    {% if current_sort == 'fame' %}
-                                        {% if current_order == 'desc' %}▼{% else %}▲{% endif %}
-                                    {% endif %}
-                                </a>
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for guild in guilds %}
-                          <tr>
-                            <td class="fw-normal">{{ guild.name }}</td>
-                            <td>
-                                {% if guild.alliance %}
-                                    <span class="badge bg-secondary fw-normal">{{ guild.alliance }}</span>
-                                {% else %}
-                                    <span class="text-muted">-</span>
-                                {% endif %}
-                            </td>
-                            <td class="text-center">
-                                <span class="text-dark fw-normal">{{ guild.playerCount if guild.playerCount else 0 }}</span>
-                            </td>
-                            <td class="text-center fw-normal">{{ guild.kills }}</td>
-                            <td class="text-center fw-normal">{{ guild.deaths }}</td>
-                            <td class="text-end">{{ "{:,}".format(guild.killFame) }}</td>
-                        </tr>
-                        {% else %}
-                        <tr>
-                            <td colspan="6" class="text-center">No guild data available.</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-        <div class="card-footer bg-white">
-            <nav aria-label="Guild navigation">
-                <ul class="pagination justify-content-center mb-0">
-                    <li class="page-item {% if page <= 1 %}disabled{% endif %}">
-                        <a class="page-link preserve-scroll" href="{{ url_for('battle_details', battle_id=battle.id, page=page-1, sort=current_sort, order=current_order, p_sort=p_sort, p_order=p_order) }}" tabindex="-1">Previous</a>
-                    </li>
-                    <li class="page-item disabled">
-                        <span class="page-link text-muted">Page {{ page }} of {{ total_pages }}</span>
-                    </li>
-                    <li class="page-item {% if page >= total_pages %}disabled{% endif %}">
-                        <a class="page-link preserve-scroll" href="{{ url_for('battle_details', battle_id=battle.id, page=page+1, sort=current_sort, order=current_order, p_sort=p_sort, p_order=p_order) }}">Next</a>
-                    </li>
-                </ul>
-            </nav>
-        </div>
-    </div>
-
     <!-- PLAYER STATISTICS SECTION -->
     <div class="card shadow mb-4">
-        <div class="card-header bg-dark text-white">
-            <h5 class="mb-0">Player Statistics</h5>
+        <div class="card-header text-dark" style="background-color: #e9ecef;">
+            <h5 class="mb-0">Players (<span id="playerCountDisplay">{{ total_players_count }}</span>)</h5>
         </div>
         <div class="card-body p-0">
             
@@ -221,109 +232,30 @@
 
             <div class="table-responsive">
                 <table id="playersTable" class="table table-hover table-mobile-compact mb-0">
-                    <thead class="table-light sticky-top" style="z-index: 5;">
+                    <thead class="table-light">
                         <tr>
                             <th>Name</th>
                             <th class="d-none d-md-table-cell">Guild</th>
                             
-                            {% macro p_sort_header(label, key) %}
-                                {% set next_order = 'asc' if p_sort == key and p_order == 'desc' else 'desc' %}
-                                <th class="text-center">
-                                    <a href="{{ url_for('battle_details', battle_id=battle.id, p_sort=key, p_order=next_order, sort=current_sort, order=current_order, page=page) }}" class="sort-link preserve-scroll">
-                                        {{ label }}
-                                        {% if p_sort == key %}
-                                            {% if p_order == 'desc' %}▼{% else %}▲{% endif %}
-                                        {% endif %}
-                                    </a>
-                                </th>
-                            {% endmacro %}
-
-                            {{ p_sort_header('IP', 'ip') }}
-                            {{ p_sort_header('Damage', 'damage') }}
-                            {{ p_sort_header('Heal', 'healing') }}
-                            {{ p_sort_header('Kills', 'kills') }}
-                            {{ p_sort_header('Deaths', 'deaths') }}
-
-                            <th class="text-end">
-                                {% set next_order = 'asc' if p_sort == 'fame' and p_order == 'desc' else 'desc' %}
-                                <a href="{{ url_for('battle_details', battle_id=battle.id, p_sort='fame', p_order=next_order, sort=current_sort, order=current_order, page=page) }}" class="sort-link text-end pe-2 preserve-scroll">
-                                    Fame
-                                    {% if p_sort == 'fame' %}
-                                        {% if p_order == 'desc' %}▼{% else %}▲{% endif %}
-                                    {% endif %}
-                                </a>
-                            </th>
+                            <th class="text-center"><a href="#" onclick="sortData('IP'); return false;" class="sort-link">IP <span id="sortIcon-IP"></span></a></th>
+                            <th class="text-center"><a href="#" onclick="sortData('Damage'); return false;" class="sort-link">Damage <span id="sortIcon-Damage"></span></a></th>
+                            <th class="text-center"><a href="#" onclick="sortData('Healing'); return false;" class="sort-link">Heal <span id="sortIcon-Healing"></span></a></th>
+                            <th class="text-center"><a href="#" onclick="sortData('Kills'); return false;" class="sort-link">Kills <span id="sortIcon-Kills"></span></a></th>
+                            <th class="text-center"><a href="#" onclick="sortData('Deaths'); return false;" class="sort-link">Deaths <span id="sortIcon-Deaths"></span></a></th>
+                            <th class="text-end"><a href="#" onclick="sortData('KillFame'); return false;" class="sort-link text-end pe-2">Fame <span id="sortIcon-KillFame">▼</span></a></th>
                         </tr>
                     </thead>
-                    <tbody>
-                        {% for p in player_stats %}
-                        <!-- FIX: Ensure data attributes are safe strings -->
-                        <tr class="player-row" 
-                            data-guild="{{ (p.GuildName or '') | string }}" 
-                            data-alliance="{{ (p.AllianceName or '') | string }}">
-                            <td>
-                                <a href="{{ url_for('player', player_id=p.Id) }}" class="text-decoration-none text-dark">
-                                    {{ p.Name }}
-                                </a>
-                                <div class="small text-muted d-md-none">{{ p.GuildName }}</div>
-                            </td>
-                            <td class="d-none d-md-table-cell">
-                                {{ p.GuildName }}
-                                {% if p.AllianceName %}
-                                    <br><small class="text-muted">[{{ p.AllianceName }}]</small>
-                                {% endif %}
-                            </td>
-                            
-                            <!-- Item Power -->
-                            <td class="text-center">{{ p.IP }}</td>
-                            
-                            <!-- Damage -->
-                            <td class="text-center">
-                                {% if p.Damage > 0 %}
-                                    <span class="text-danger">{{ "{:,}".format(p.Damage) }}</span>
-                                {% else %}
-                                    <span class="text-danger">0</span>
-                                {% endif %}
-                            </td>
-
-                            <!-- Heal -->
-                            <td class="text-center">
-                                {% if p.Healing > 0 %}
-                                    <span class="text-success">{{ "{:,}".format(p.Healing) }}</span>
-                                {% else %}
-                                    <span class="text-success">0</span>
-                                {% endif %}
-                            </td>
-
-                            <!-- Kills -->
-                            <td class="text-center">
-                                {% if p.Kills|length > 0 %}
-                                    <!-- FIX: Ensure ID is quoted -->
-                                    <span class="badge bg-primary kill-count-btn" 
-                                          data-player-id="{{ p.Id }}">
-                                        {{ p.Kills|length }}
-                                    </span>
-                                {% else %}
-                                    <span class="badge bg-primary text-normal">0</span>
-                                {% endif %}
-                            </td>
-
-                            <!-- Deaths -->
-                            <td class="text-center">
-                                {% if p.Deaths > 0 %}
-                                    <span class="badge text-normal bg-danger">{{ p.Deaths }}</span>
-                                {% else %}
-                                    <span class="badge text-normal bg-danger">0</span>
-                                {% endif %}
-                            </td>
-
-                            <!-- Fame -->
-                            <td class="text-end"><span class="badge bg-warning text-normal">{{ "{:,}".format(p.KillFame) }}</span></td>
-                        </tr>
-                        {% endfor %}
+                    <tbody id="playersTableBody">
                     </tbody>
                 </table>
             </div>
+        </div>
+        <!-- PLAYER PAGINATION FOOTER -->
+        <div class="card-footer bg-white">
+            <nav aria-label="Player navigation">
+                <ul class="pagination justify-content-center mb-0 pagination-sm" id="jsPagination">
+                </ul>
+            </nav>
         </div>
     </div>
 </div>
@@ -347,27 +279,38 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script id="battle-data-json" type="application/json">
-    {{ player_stats | tojson | safe }}
+    {{ all_player_stats | tojson | safe }}
 </script>
+<script id="guild-data-json" type="application/json">
+    {{ guilds | tojson | safe }}
+</script>
+
 <script>
-    // Safe JSON parsing
+    // --- DATA PARSING ---
     let battleData = [];
+    let guildData = [];
     try {
         battleData = JSON.parse(document.getElementById('battle-data-json').textContent);
+        guildData = JSON.parse(document.getElementById('guild-data-json').textContent);
     } catch (e) {
-        console.error("Failed to parse battle data JSON", e);
+        console.error("Failed to parse JSON data", e);
     }
 
-    $(document).ready(function() {
-        var scrollPos = sessionStorage.getItem('battleScrollPos');
-        if (scrollPos) {
-            $(window).scrollTop(scrollPos);
-            sessionStorage.removeItem('battleScrollPos');
-        }
+    // --- PLAYER STATE ---
+    let filteredData = [...battleData];
+    let currentPage = 1;
+    const pageSize = 50;
+    let currentSort = 'KillFame';
+    let currentOrder = 'desc';
 
-        $('.preserve-scroll').on('click', function() {
-            sessionStorage.setItem('battleScrollPos', $(window).scrollTop());
-        });
+    // --- GUILD STATE ---
+    let currentGuildPage = 1;
+    const guildPageSize = 10;
+    let currentGuildSort = 'killFame';
+    let currentGuildOrder = 'desc';
+
+    $(document).ready(function() {
+        // --- INITIALIZE PLAYERS ---
         var savedGuild = sessionStorage.getItem('battleGuildFilter');
         var savedAlliance = sessionStorage.getItem('battleAllianceFilter');
         var savedName = sessionStorage.getItem('battleNameFilter');
@@ -376,53 +319,28 @@
         if (savedAlliance) $('#allianceFilter').val(savedAlliance);
         if (savedName) $('#playerFilter').val(savedName);
 
-        function filterPlayers() {
-            var guildVal = ($('#guildFilter').val() || "").toLowerCase();
-            var allianceVal = ($('#allianceFilter').val() || "").toLowerCase();
-            var nameVal = ($('#playerFilter').val() || "").toLowerCase();
+        applyFilters();
 
-            sessionStorage.setItem('battleGuildFilter', $('#guildFilter').val());
-            sessionStorage.setItem('battleAllianceFilter', $('#allianceFilter').val());
-            sessionStorage.setItem('battleNameFilter', $('#playerFilter').val());
+        $('#guildFilter, #allianceFilter').change(applyFilters);
+        $('#playerFilter').on('keyup', function() {
+            applyFilters();
+        });
 
-            $('#playersTable tbody tr').each(function() {
-                var row = $(this);
-                // Force string conversion to prevent type errors
-                var g = String(row.data('guild') || "").toLowerCase();
-                var a = String(row.data('alliance') || "").toLowerCase();
-                var n = row.find('td:first').text().trim().toLowerCase();
+        // --- INITIALIZE GUILDS ---
+        sortAndRenderGuilds();
 
-                var show = true;
-                if (guildVal && g !== guildVal) show = false;
-                if (allianceVal && a !== allianceVal) show = false;
-                if (nameVal && !n.includes(nameVal)) show = false;
-
-                row.toggle(show);
-            });
-        }
-
-        filterPlayers();
-
-        $('#guildFilter, #allianceFilter').change(filterPlayers);
-        $('#playerFilter').on('keyup', filterPlayers);
-
+        // --- MODAL LOGIC ---
         var currentKillsData = [];
-
         $(document).on('click', '.kill-count-btn', function() {
-            var pid = String($(this).data('player-id')); // Force string
-            
-            // Robust find
+            var pid = String($(this).data('player-id')); 
             var player = battleData.find(p => String(p.Id) === pid);
             
             if (player && player.Kills) {
                 currentKillsData = player.Kills;
                 $('#modalKillerName').text(player.Name);
                 renderVictimList();
-                
                 var myModal = new bootstrap.Modal(document.getElementById('killsModal'));
                 myModal.show();
-            } else {
-                console.error("Player data not found for ID:", pid);
             }
         });
 
@@ -528,5 +446,268 @@
             });
         }
     });
+
+    // ==========================================
+    // PLAYER LOGIC
+    // ==========================================
+
+    function applyFilters() {
+        var guildVal = ($('#guildFilter').val() || "").toLowerCase();
+        var allianceVal = ($('#allianceFilter').val() || "").toLowerCase();
+        var nameVal = ($('#playerFilter').val() || "").toLowerCase();
+
+        sessionStorage.setItem('battleGuildFilter', $('#guildFilter').val());
+        sessionStorage.setItem('battleAllianceFilter', $('#allianceFilter').val());
+        sessionStorage.setItem('battleNameFilter', $('#playerFilter').val());
+
+        filteredData = battleData.filter(p => {
+            var g = String(p.GuildName || "").toLowerCase();
+            var a = String(p.AllianceName || "").toLowerCase();
+            var n = String(p.Name || "").toLowerCase();
+
+            if (guildVal && g !== guildVal) return false;
+            if (allianceVal && a !== allianceVal) return false;
+            if (nameVal && !n.includes(nameVal)) return false;
+            return true;
+        });
+
+        $('#playerCountDisplay').text(filteredData.length);
+        currentPage = 1;
+        sortAndRender();
+    }
+
+    window.sortData = function(key) {
+        if (currentSort === key) {
+            currentOrder = (currentOrder === 'desc') ? 'asc' : 'desc';
+        } else {
+            currentSort = key;
+            currentOrder = 'desc';
+        }
+        sortAndRender();
+    }
+
+    function sortAndRender() {
+        $('.sort-link span[id^="sortIcon-"]').text(''); 
+        var icon = (currentOrder === 'desc') ? '▼' : '▲';
+        $('#sortIcon-' + currentSort).text(icon);
+
+        filteredData.sort((a, b) => {
+            let valA = a[currentSort];
+            let valB = b[currentSort];
+
+            if (currentSort === 'Kills') {
+                valA = valA ? valA.length : 0;
+                valB = valB ? valB.length : 0;
+            } else {
+                if (valA === undefined || valA === null) valA = 0;
+                if (valB === undefined || valB === null) valB = 0;
+            }
+
+            if (valA < valB) return (currentOrder === 'asc') ? -1 : 1;
+            if (valA > valB) return (currentOrder === 'asc') ? 1 : -1;
+            return 0;
+        });
+
+        renderTable();
+        renderPagination();
+    }
+
+    function renderTable() {
+        var tbody = $('#playersTableBody');
+        tbody.empty();
+
+        var start = (currentPage - 1) * pageSize;
+        var end = start + pageSize;
+        var pageData = filteredData.slice(start, end);
+
+        if (pageData.length === 0) {
+            tbody.append('<tr><td colspan="8" class="text-center py-3">No players found.</td></tr>');
+            return;
+        }
+
+        pageData.forEach(p => {
+            var killCount = (p.Kills && p.Kills.length) ? p.Kills.length : 0;
+            var killBadge = killCount > 0 
+                ? `<span class="badge bg-primary kill-count-btn" data-player-id="${p.Id}">${killCount}</span>`
+                : `<span class="badge bg-primary">0</span>`;
+            
+            var damageVal = p.Damage > 0 ? `<span class="text-danger">${Number(p.Damage).toLocaleString()}</span>` : `<span class="text-danger">0</span>`;
+            var healVal = p.Healing > 0 ? `<span class="text-success">${Number(p.Healing).toLocaleString()}</span>` : `<span class="text-success">0</span>`;
+            var deathVal = p.Deaths > 0 ? `<span class="badge bg-danger">${p.Deaths}</span>` : `<span class="badge bg-danger">0</span>`;
+            var fameVal = `<span class="badge bg-warning text-dark">${Number(p.KillFame).toLocaleString()}</span>`;
+
+            var allianceHtml = p.AllianceName ? `<br><small class="text-muted"><span class="badge bg-secondary text-white">${p.AllianceName}</span></small>` : '';
+
+            var row = `
+                <tr>
+                    <td>
+                        <a href="/player/${p.Id}" class="text-decoration-none text-dark">${p.Name}</a>
+                        <div class="small text-muted d-md-none">${p.GuildName}</div>
+                    </td>
+                    <td class="d-none d-md-table-cell">
+                        ${p.GuildName}
+                        ${allianceHtml}
+                    </td>
+                    <td class="text-center">${p.IP}</td>
+                    <td class="text-center">${damageVal}</td>
+                    <td class="text-center">${healVal}</td>
+                    <td class="text-center">${killBadge}</td>
+                    <td class="text-center">${deathVal}</td>
+                    <td class="text-end">${fameVal}</td>
+                </tr>
+            `;
+            tbody.append(row);
+        });
+    }
+
+    function renderPagination() {
+        var totalPages = Math.ceil(filteredData.length / pageSize);
+        var nav = $('#jsPagination');
+        nav.empty();
+
+        if (totalPages <= 1) return;
+
+        var prevClass = (currentPage <= 1) ? 'disabled' : '';
+        nav.append(`
+            <li class="page-item ${prevClass}">
+                <a class="page-link" href="#" onclick="changePage(${currentPage - 1}); return false;">Prev</a>
+            </li>
+        `);
+
+        nav.append(`
+            <li class="page-item disabled">
+                <span class="page-link text-muted">${currentPage}/${totalPages}</span>
+            </li>
+        `);
+
+        var nextClass = (currentPage >= totalPages) ? 'disabled' : '';
+        nav.append(`
+            <li class="page-item ${nextClass}">
+                <a class="page-link" href="#" onclick="changePage(${currentPage + 1}); return false;">Next</a>
+            </li>
+        `);
+    }
+
+    window.changePage = function(newPage) {
+        var totalPages = Math.ceil(filteredData.length / pageSize);
+        if (newPage < 1 || newPage > totalPages) return;
+        currentPage = newPage;
+        renderTable();
+        renderPagination();
+        $('html, body').animate({
+            scrollTop: $("#playersTable").offset().top - 100
+        }, 200);
+    }
+
+    // ==========================================
+    // GUILD LOGIC
+    // ==========================================
+
+    window.sortGuilds = function(key) {
+        if (currentGuildSort === key) {
+            currentGuildOrder = (currentGuildOrder === 'desc') ? 'asc' : 'desc';
+        } else {
+            currentGuildSort = key;
+            currentGuildOrder = 'desc';
+        }
+        sortAndRenderGuilds();
+    }
+
+    function sortAndRenderGuilds() {
+        // Update Icons
+        $('.sort-link span[id^="gSortIcon-"]').text('');
+        var icon = (currentGuildOrder === 'desc') ? '▼' : '▲';
+        $('#gSortIcon-' + currentGuildSort).text(icon);
+
+        guildData.sort((a, b) => {
+            let valA = a[currentGuildSort];
+            let valB = b[currentGuildSort];
+
+            if (valA === undefined || valA === null) valA = 0;
+            if (valB === undefined || valB === null) valB = 0;
+
+            if (valA < valB) return (currentGuildOrder === 'asc') ? -1 : 1;
+            if (valA > valB) return (currentGuildOrder === 'asc') ? 1 : -1;
+            return 0;
+        });
+
+        renderGuildTable();
+        renderGuildPagination();
+    }
+
+    function renderGuildTable() {
+        var tbody = $('#guildsTableBody');
+        tbody.empty();
+
+        var start = (currentGuildPage - 1) * guildPageSize;
+        var end = start + guildPageSize;
+        var pageData = guildData.slice(start, end);
+
+        if (pageData.length === 0) {
+            tbody.append('<tr><td colspan="5" class="text-center">No guild data available.</td></tr>');
+            return;
+        }
+
+        pageData.forEach(g => {
+            var allianceHtml = g.alliance ? `<br><span class="badge bg-secondary text-white" style="font-size: 0.7em !important;">${g.alliance}</span>` : '';
+            var pCount = g.playerCount || 0;
+            var kills = g.kills || 0;
+            var deaths = g.deaths || 0;
+            var fame = Number(g.killFame || 0).toLocaleString();
+
+            var row = `
+                <tr>
+                    <td>
+                        ${g.name}
+                        ${allianceHtml}
+                    </td>
+                    <td class="text-center">
+                        <span class="text-dark">${pCount}</span>
+                    </td>
+                    <td class="text-center">${kills}</td>
+                    <td class="text-center">${deaths}</td>
+                    <td class="text-end">${fame}</td>
+                </tr>
+            `;
+            tbody.append(row);
+        });
+    }
+
+    function renderGuildPagination() {
+        var totalPages = Math.ceil(guildData.length / guildPageSize);
+        var nav = $('#guildsPagination');
+        nav.empty();
+
+        if (totalPages <= 1) return;
+
+        var prevClass = (currentGuildPage <= 1) ? 'disabled' : '';
+        nav.append(`
+            <li class="page-item ${prevClass}">
+                <a class="page-link" href="#" onclick="changeGuildPage(${currentGuildPage - 1}); return false;">Prev</a>
+            </li>
+        `);
+
+        nav.append(`
+            <li class="page-item disabled">
+                <span class="page-link text-muted">${currentGuildPage}/${totalPages}</span>
+            </li>
+        `);
+
+        var nextClass = (currentGuildPage >= totalPages) ? 'disabled' : '';
+        nav.append(`
+            <li class="page-item ${nextClass}">
+                <a class="page-link" href="#" onclick="changeGuildPage(${currentGuildPage + 1}); return false;">Next</a>
+            </li>
+        `);
+    }
+
+    window.changeGuildPage = function(newPage) {
+        var totalPages = Math.ceil(guildData.length / guildPageSize);
+        if (newPage < 1 || newPage > totalPages) return;
+        currentGuildPage = newPage;
+        renderGuildTable();
+        renderGuildPagination();
+    }
+
 </script>
 {% endblock %}

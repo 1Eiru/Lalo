@@ -1,8 +1,8 @@
-from flask import Flask, render_template, url_for, jsonify, request
+from flask import Flask, render_template, jsonify, request
 from pymongo import MongoClient, ASCENDING, DESCENDING
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from flask_apscheduler import APScheduler
-import requests, json, os, time, math
+import requests, os, time, math
 
 app = Flask(__name__)
 scheduler = APScheduler()
@@ -108,6 +108,8 @@ def fetch_battles_data(sort_type='recent', time_range='week', limit=50, offset=0
             battles = response.json()
             count = 0
             for b in battles:
+                if b.get('totalFame', 0) <= 100000:
+                    continue
                 try:
                     try:
                         end_time = datetime.fromisoformat(b['endTime'].replace('Z', '+00:00'))
@@ -234,9 +236,34 @@ def get_battle_details_cached(battle_id):
     cached = battles_cache.find_one({'battle_id': battle_id})
     if cached:
         return cached['players']
-    events = fetch_full_battle_history(battle_id)
+    
     players_map = {}
-    def init_player(p_id, name, guild, alliance, ip=0):
+    try:
+        summary_url = f"https://gameinfo-sgp.albiononline.com/api/gameinfo/battles/{battle_id}"
+        r_summary = requests.get(summary_url, timeout=10)
+        if r_summary.status_code == 200:
+            summary_data = r_summary.json()
+            raw_players = summary_data.get('players', {})
+            
+            for pid, pdata in raw_players.items():
+                players_map[str(pid)] = {
+                    'Id': str(pdata.get('id')),
+                    'Name': pdata.get('name', 'Unknown'),
+                    'GuildName': pdata.get('guildName', ''),
+                    'AllianceName': pdata.get('allianceName', ''),
+                    'Kills': [], 
+                    'Deaths': pdata.get('deaths', 0),
+                    'KillFame': pdata.get('killFame', 0),
+                    'Damage': 0,  
+                    'Healing': 0,
+                    'IP': 0    
+                }
+    except Exception as e:
+        print(f"Error fetching battle summary for player list: {e}")
+
+    events = fetch_full_battle_history(battle_id)
+    
+    def init_player_if_missing(p_id, name, guild, alliance, ip=0):
         p_id = str(p_id)
         if p_id not in players_map:
             players_map[p_id] = {
@@ -254,23 +281,31 @@ def get_battle_details_cached(battle_id):
         else:
             if int(ip) > players_map[p_id]['IP']:
                 players_map[p_id]['IP'] = int(ip)
+
     for e in events:
         k = e['Killer']
         v = e['Victim']
         parts = e.get('Participants', [])
-        init_player(k['Id'], k['Name'], k.get('GuildName'), k.get('AllianceName'), k.get('AverageItemPower', 0))
-        players_map[str(k['Id'])]['Kills'].append(e)
-        players_map[str(k['Id'])]['KillFame'] += e.get('TotalVictimKillFame', 0)
         
-        init_player(v['Id'], v['Name'], v.get('GuildName'), v.get('AllianceName'), v.get('AverageItemPower', 0))
-        players_map[str(v['Id'])]['Deaths'] += 1
+        # Process Killer
+        init_player_if_missing(k['Id'], k['Name'], k.get('GuildName'), k.get('AllianceName'), k.get('AverageItemPower', 0))
+        players_map[str(k['Id'])]['Kills'].append(e)
+        if players_map[str(k['Id'])]['KillFame'] == 0:
+             players_map[str(k['Id'])]['KillFame'] += e.get('TotalVictimKillFame', 0)
+        
+        # Process Victim
+        init_player_if_missing(v['Id'], v['Name'], v.get('GuildName'), v.get('AllianceName'), v.get('AverageItemPower', 0))
+        if players_map[str(v['Id'])]['Deaths'] == 0:
+            players_map[str(v['Id'])]['Deaths'] += 1
 
+        # Process Participants (Damage/Healing)
         for p in parts:
-            init_player(p['Id'], p['Name'], p.get('GuildName'), p.get('AllianceName'), p.get('AverageItemPower', 0))
+            init_player_if_missing(p['Id'], p['Name'], p.get('GuildName'), p.get('AllianceName'), p.get('AverageItemPower', 0))
             players_map[str(p['Id'])]['Damage'] += int(p.get('DamageDone', 0))
             players_map[str(p['Id'])]['Healing'] += int(p.get('SupportHealingDone', 0))
 
     players_list = list(players_map.values())
+    
     if players_list:
         battles_cache.update_one(
             {'battle_id': battle_id},
@@ -446,11 +481,12 @@ def battles():
     search_query = request.args.get('search', '').strip()
     per_page = 25
     skip_amount = (page - 1) * per_page
+    base_query = {'totalFame': {'$gt': 100000}}
     
-    mongo_query = {}
     if search_query:
+        search_filter = {}
         if search_query.isdigit():
-             mongo_query = {
+             search_filter = {
                 "$or": [
                     {'id': int(search_query)},
                     {"player_names": {"$regex": search_query, "$options": "i"}},
@@ -458,12 +494,15 @@ def battles():
                 ]
             }
         else:
-            mongo_query = {
+            search_filter = {
                 "$or": [
                     {"player_names": {"$regex": search_query, "$options": "i"}},
                     {"guild_names": {"$regex": search_query, "$options": "i"}}
                 ]
             }
+        mongo_query = {"$and": [base_query, search_filter]}
+    else:
+        mongo_query = base_query
             
     total_battles = battles_collection.count_documents(mongo_query)
     total_pages = math.ceil(total_battles / per_page)
@@ -483,11 +522,13 @@ def api_battles_list():
     page = request.args.get('page', 1, type=int)
     search_query = request.args.get('search', '').strip()
     per_page = 25
-    skip_amount = (page - 1) * per_page
-    mongo_query = {}
+    skip_amount = (page - 1) * per_page 
+    base_query = {'totalFame': {'$gt': 100000}}
+
     if search_query:
+        search_filter = {}
         if search_query.isdigit():
-             mongo_query = {
+             search_filter = {
                 "$or": [
                     {'id': int(search_query)},
                     {"player_names": {"$regex": search_query, "$options": "i"}},
@@ -495,12 +536,15 @@ def api_battles_list():
                 ]
             }
         else:
-            mongo_query = {
+            search_filter = {
                 "$or": [
                     {"player_names": {"$regex": search_query, "$options": "i"}},
                     {"guild_names": {"$regex": search_query, "$options": "i"}}
                 ]
             }
+        mongo_query = {"$and": [base_query, search_filter]}
+    else:
+        mongo_query = base_query
 
     total_battles = battles_collection.count_documents(mongo_query)
     total_pages = math.ceil(total_battles / per_page)
@@ -553,62 +597,44 @@ def battle_details(battle_id):
 
     if not battle:
         return "Battle not found", 404
+    
+    alliance_player_counts = {}
+    if 'guilds' in battle:
+        for g in battle['guilds'].values():
+            aid = g.get('allianceId')
+            p_count = g.get('playerCount', 0)
+            if aid:
+                alliance_player_counts[aid] = alliance_player_counts.get(aid, 0) + p_count
+
+    alliances_list = []
+    if 'alliances' in battle:
+        for aid, adata in battle['alliances'].items():
+            adata['playerCount'] = alliance_player_counts.get(aid, 0)
+            alliances_list.append(adata)
+    
+    alliances_list.sort(key=lambda x: x.get('killFame', 0) or 0, reverse=True)
+
     guilds_list = []
     if 'guilds' in battle:
         guilds_list = list(battle['guilds'].values())
 
-    g_sort = request.args.get('sort', 'fame')
-    g_order = request.args.get('order', 'desc')
-    g_key_map = {'fame': 'killFame', 'kills': 'kills', 'deaths': 'deaths', 'players': 'playerCount'}
-    g_sort_key = g_key_map.get(g_sort, 'killFame')
-    
-    guilds_list.sort(key=lambda x: x.get(g_sort_key, 0) or 0, reverse=(g_order == 'desc'))
+    guilds_list.sort(key=lambda x: x.get('killFame', 0) or 0, reverse=True)
 
-    page = request.args.get('page', 1, type=int)
-    per_page = 10
-    total_guilds = len(guilds_list)
-    total_pages = math.ceil(total_guilds / per_page)
-    start = (page - 1) * per_page
-    end = start + per_page
-    paginated_guilds = guilds_list[start:end]
+    # --- Players Logic ---
+    all_player_stats = get_battle_details_cached(battle_id)
+    all_player_stats.sort(key=lambda x: x.get('KillFame', 0) or 0, reverse=True)
+    total_players_count = len(all_player_stats)
 
-    player_stats = get_battle_details_cached(battle_id)
-    
-    # Player Sort
-    p_sort = request.args.get('p_sort', 'fame')
-    p_order = request.args.get('p_order', 'desc')
-    
-    p_key_map = {
-        'fame': 'KillFame',
-        'kills': 'Kills', 
-        'deaths': 'Deaths',
-        'damage': 'Damage',
-        'healing': 'Healing',
-        'ip': 'IP'
-    }
-    p_sort_key = p_key_map.get(p_sort, 'KillFame')
-    p_reverse = (p_order == 'desc')
-
-    def player_sorter(x):
-        val = x.get(p_sort_key, 0)
-        if p_sort == 'kills' and isinstance(val, list):
-            return len(val)
-        return val or 0
-
-    player_stats.sort(key=player_sorter, reverse=p_reverse)
-    unique_guilds = sorted(list(set(p['GuildName'] for p in player_stats if p['GuildName'])))
-    unique_alliances = sorted(list(set(p['AllianceName'] for p in player_stats if p['AllianceName'])))
+    unique_guilds = sorted(list(set(p['GuildName'] for p in all_player_stats if p['GuildName'])))
+    unique_alliances = sorted(list(set(p['AllianceName'] for p in all_player_stats if p['AllianceName'])))
 
     return render_template('battle_details.html', 
                            battle=battle, 
-                           guilds=paginated_guilds, 
-                           page=page, 
-                           total_pages=total_pages,
-                           current_sort=g_sort,
-                           current_order=g_order,
-                           player_stats=player_stats,
-                           p_sort=p_sort,
-                           p_order=p_order,
+                           guilds=guilds_list, # Pass full list
+                           alliances=alliances_list,                           
+                           all_player_stats=all_player_stats, 
+                           total_players_count=total_players_count,
+                           
                            unique_guilds=unique_guilds,
                            unique_alliances=unique_alliances)
 
