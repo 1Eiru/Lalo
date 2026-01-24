@@ -83,12 +83,16 @@
     }
 
     @media (max-width: 576px) {
+        .modal-body {
+            padding-left: 0.5rem;
+            padding-right: 0.5rem;
+        }
         .mini-grid-item {
             height: 45px;
             width: 45px;
         }
         .gear-container {
-            width: 150px; 
+            width: 155px; 
         }
         .modal-title {
             font-size: 1rem;
@@ -122,7 +126,7 @@
             <div class="row mt-3 justify-content-center">
                 <div class="col-md-3">
                     <div class="p-2 border rounded bg-light">
-                        <strong>Total Fame 😱</strong><br>
+                        <strong>Total Fame 👍</strong><br>
                         {{ "{:,}".format(battle.totalFame) }}
                     </div>
                 </div>
@@ -288,7 +292,7 @@
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title" id="modalKillerName"></h5>
+                <h5 class="modal-title text-truncate" id="modalKillerName" style="max-width: 90%;"></h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body" id="killsModalBody">
@@ -355,7 +359,7 @@
 
         // --- MODAL LOGIC ---
         var currentModalEvents = [];
-        var currentModalMode = 'kills'; // 'kills' or 'deaths'
+        var currentModalMode = 'kills'; 
 
         // Handle Kills Click
         $(document).on('click', '.kill-count-btn', function() {
@@ -375,7 +379,7 @@
         // Handle Deaths Click
         $(document).on('click', '.death-count-btn', function() {
             var pid = String($(this).data('player-id')); 
-            var player = battleData.find(p => String(p.Id) === pid);
+            var player = battleData.find(p => String(p.Id) === pid);       
             var dEvents = player.DeathEvents || [];
 
             if (player && dEvents.length > 0) {
@@ -389,10 +393,10 @@
         });
 
         function renderModalList() {
-            var html = '<div class="list-group">';
+            var html = '<div class="list-group list-group-flush">';
             
             if (currentModalEvents.length === 0) {
-                html += '<div class="p-3 text-center text-muted">No detailed event data available.</div></div>';
+                html += '<div class="p-4 text-center text-muted">No detailed event data available.</div></div>';
                 $('#killsModalBody').html(html);
                 return;
             }
@@ -403,13 +407,24 @@
                 var roleText = (currentModalMode === 'kills') ? 'Victim' : 'Killer';
                 
                 html += `
-                    <a href="#" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center modal-event-item" data-index="${index}">
-                        <div>
-                            <span class="badge ${badgeColor} me-2">${roleText}</span>
-                            <span class="fw-bold">${target.Name}</span>
-                            <small class="text-muted">(${target.GuildName})</small>
+                    <a href="#" class="list-group-item list-group-item-action d-flex align-items-center modal-event-item py-3 px-2 px-sm-3" data-index="${index}">
+                        
+                        <!-- Left: Role Badge -->
+                        <div class="flex-shrink-0 me-2 me-sm-3">
+                            <span class="badge ${badgeColor}" style="width: 55px;">${roleText}</span>
                         </div>
-                        <span class="badge bg-secondary">${Number(event.TotalVictimKillFame).toLocaleString()} Fame</span>
+
+                        <!-- Middle: Name & Guild (Truncates) -->
+                        <div class="flex-grow-1 text-truncate me-2">
+                            <div class="fw-bold text-truncate" style="font-size: 1rem;">${target.Name}</div>
+                            <div class="small text-muted text-truncate">${target.GuildName}</div>
+                        </div>
+
+                        <!-- Right: Fame -->
+                        <div class="flex-shrink-0 text-end">
+                            <span class="badge bg-secondary d-block">${Number(event.TotalVictimKillFame).toLocaleString()}</span>
+                            <small class="text-muted d-none d-sm-block" style="font-size: 0.7em;">Fame</small>
+                        </div>
                     </a>
                 `;
             });
@@ -454,27 +469,41 @@
                     </div>
                 `;
             }
+
             var html = `
-                <button class="btn btn-sm btn-outline-secondary mb-3" id="backToList">&larr; Back to List</button>
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <button class="btn btn-sm btn-outline-secondary" id="backToList">&larr; Back</button>
+                    <small class="text-muted">Event Detail</small>
+                </div>
+                
                 <div class="row g-3">
+                    <!-- Killer Column -->
                     <div class="col-12 col-md-6 text-center border-end-md">
-                        <h6 class="text-primary">Killer: ${k.Name}</h6>
-                        <small class="d-block mb-2 text-muted">${k.GuildName}</small>
-                        <div class="mt-2">
-                            ${buildGearGrid(k.Equipment, 'hsla(145, 100%, 50%, 0.2)')}
+                        <div class="p-2 border rounded bg-light-subtle h-100">
+                            <h6 class="text-primary fw-bold mb-0">${k.Name}</h6>
+                            <small class="d-block mb-2 text-muted">${k.GuildName}</small>
+                            <div class="mt-2">
+                                ${buildGearGrid(k.Equipment, 'hsla(145, 100%, 50%, 0.2)')}
+                            </div>
                         </div>
                     </div>
+                    
+                    <!-- Victim Column -->
                     <div class="col-12 col-md-6 text-center border-top border-md-top-0 pt-3 pt-md-0">
-                        <h6 class="text-danger">Victim: ${v.Name}</h6>
-                        <small class="d-block mb-2 text-muted">${v.GuildName}</small>
-                        <div class="mt-2">
-                            ${buildGearGrid(v.Equipment, 'hsla(0, 80%, 43%, 0.2)')}
+                        <div class="p-2 border rounded bg-light-subtle h-100">
+                            <h6 class="text-danger fw-bold mb-0">${v.Name}</h6>
+                            <small class="d-block mb-2 text-muted">${v.GuildName}</small>
+                            <div class="mt-2">
+                                ${buildGearGrid(v.Equipment, 'hsla(0, 80%, 43%, 0.2)')}
+                            </div>
                         </div>
                     </div>
                 </div>
-                <hr>
-                <h6 class="text-center">Victim Inventory</h6>
-                <div class="d-flex flex-wrap justify-content-center">
+                
+                <hr class="my-4">
+                
+                <h6 class="text-center mb-3">Victim Inventory</h6>
+                <div class="d-flex flex-wrap justify-content-center gap-1">
             `;
 
             if (v.Inventory) {
@@ -681,6 +710,7 @@
     }
 
     function sortAndRenderGuilds() {
+        // Update Icons
         $('.sort-link span[id^="gSortIcon-"]').text('');
         var icon = (currentGuildOrder === 'desc') ? '▼' : '▲';
         $('#gSortIcon-' + currentGuildSort).text(icon);
