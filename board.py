@@ -252,6 +252,7 @@ def get_battle_details_cached(battle_id):
                     'GuildName': pdata.get('guildName', ''),
                     'AllianceName': pdata.get('allianceName', ''),
                     'Kills': [], 
+                    'DeathEvents': [],
                     'Deaths': pdata.get('deaths', 0),
                     'KillFame': pdata.get('killFame', 0),
                     'Damage': 0,  
@@ -271,7 +272,8 @@ def get_battle_details_cached(battle_id):
                 'Name': name,
                 'GuildName': guild if guild else "",
                 'AllianceName': alliance if alliance else "",
-                'Kills': [],     
+                'Kills': [],
+                'DeathEvents': [],
                 'Deaths': 0,
                 'KillFame': 0,
                 'Damage': 0,      
@@ -295,8 +297,10 @@ def get_battle_details_cached(battle_id):
         
         # Process Victim
         init_player_if_missing(v['Id'], v['Name'], v.get('GuildName'), v.get('AllianceName'), v.get('AverageItemPower', 0))
+        players_map[str(v['Id'])]['DeathEvents'].append(e)
         if players_map[str(v['Id'])]['Deaths'] == 0:
             players_map[str(v['Id'])]['Deaths'] += 1
+        players_map[str(v['Id'])]['Deaths'] = max(players_map[str(v['Id'])]['Deaths'], len(players_map[str(v['Id'])]['DeathEvents']))
 
         # Process Participants (Damage/Healing)
         for p in parts:

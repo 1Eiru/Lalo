@@ -27,6 +27,7 @@
             white-space: nowrap;     
         }
     }
+
     .sort-link {
         color: inherit;
         text-decoration: none;
@@ -39,14 +40,17 @@
         color: #0d6efd;
         background-color: rgba(0,0,0,0.02);
     }
-    .kill-count-btn {
+
+    .kill-count-btn, .death-count-btn {
         cursor: pointer;
         text-decoration: underline;
+        transition: opacity 0.2s;
     }
-    .kill-count-btn:hover {
-        background-color: #0b5ed7 !important;
+    .kill-count-btn:hover, .death-count-btn:hover {
+        opacity: 0.8;
         color: white;
     }
+
     .mini-grid-item {
         height: 60px;
         width: 60px;
@@ -66,10 +70,29 @@
         color: white;
         font-size: 10px;
         padding: 0 3px;
+        border-radius: 2px;
     }
     .mini-grid-item img {
         max-width: 100%;
         max-height: 100%;
+    }
+
+    .gear-container {
+        width: 200px; 
+        margin: 0 auto;
+    }
+
+    @media (max-width: 576px) {
+        .mini-grid-item {
+            height: 45px;
+            width: 45px;
+        }
+        .gear-container {
+            width: 150px; 
+        }
+        .modal-title {
+            font-size: 1rem;
+        }
     }
 </style>
 {% endblock %}
@@ -99,7 +122,7 @@
             <div class="row mt-3 justify-content-center">
                 <div class="col-md-3">
                     <div class="p-2 border rounded bg-light">
-                        <strong>Total Fame 💰</strong><br>
+                        <strong>Total Fame 😱</strong><br>
                         {{ "{:,}".format(battle.totalFame) }}
                     </div>
                 </div>
@@ -260,11 +283,12 @@
     </div>
 </div>
 
+<!-- MODAL FOR KILLS/DEATHS -->
 <div class="modal fade" id="killsModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title">Kills by <span id="modalKillerName"></span></h5>
+                <h5 class="modal-title" id="modalKillerName"></h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body" id="killsModalBody">
@@ -330,29 +354,60 @@
         sortAndRenderGuilds();
 
         // --- MODAL LOGIC ---
-        var currentKillsData = [];
+        var currentModalEvents = [];
+        var currentModalMode = 'kills'; // 'kills' or 'deaths'
+
+        // Handle Kills Click
         $(document).on('click', '.kill-count-btn', function() {
             var pid = String($(this).data('player-id')); 
             var player = battleData.find(p => String(p.Id) === pid);
             
             if (player && player.Kills) {
-                currentKillsData = player.Kills;
-                $('#modalKillerName').text(player.Name);
-                renderVictimList();
+                currentModalEvents = player.Kills;
+                currentModalMode = 'kills';
+                $('#modalKillerName').text(player.Name + " (Kills)");
+                renderModalList();
                 var myModal = new bootstrap.Modal(document.getElementById('killsModal'));
                 myModal.show();
             }
         });
 
-        function renderVictimList() {
+        // Handle Deaths Click
+        $(document).on('click', '.death-count-btn', function() {
+            var pid = String($(this).data('player-id')); 
+            var player = battleData.find(p => String(p.Id) === pid);
+            var dEvents = player.DeathEvents || [];
+
+            if (player && dEvents.length > 0) {
+                currentModalEvents = dEvents;
+                currentModalMode = 'deaths';
+                $('#modalKillerName').text(player.Name + " (Deaths)");
+                renderModalList();
+                var myModal = new bootstrap.Modal(document.getElementById('killsModal'));
+                myModal.show();
+            }
+        });
+
+        function renderModalList() {
             var html = '<div class="list-group">';
-            currentKillsData.forEach(function(event, index) {
-                var v = event.Victim;
+            
+            if (currentModalEvents.length === 0) {
+                html += '<div class="p-3 text-center text-muted">No detailed event data available.</div></div>';
+                $('#killsModalBody').html(html);
+                return;
+            }
+
+            currentModalEvents.forEach(function(event, index) {
+                var target = (currentModalMode === 'kills') ? event.Victim : event.Killer;
+                var badgeColor = (currentModalMode === 'kills') ? 'bg-danger' : 'bg-primary'; 
+                var roleText = (currentModalMode === 'kills') ? 'Victim' : 'Killer';
+                
                 html += `
-                    <a href="#" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center victim-item" data-index="${index}">
+                    <a href="#" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center modal-event-item" data-index="${index}">
                         <div>
-                            <span class="fw-bold text-danger">${v.Name}</span>
-                            <small class="text-muted">(${v.GuildName})</small>
+                            <span class="badge ${badgeColor} me-2">${roleText}</span>
+                            <span class="fw-bold">${target.Name}</span>
+                            <small class="text-muted">(${target.GuildName})</small>
                         </div>
                         <span class="badge bg-secondary">${Number(event.TotalVictimKillFame).toLocaleString()} Fame</span>
                     </a>
@@ -361,10 +416,10 @@
             html += '</div>';
             $('#killsModalBody').html(html);
 
-            $('.victim-item').click(function(e) {
+            $('.modal-event-item').click(function(e) {
                 e.preventDefault();
                 var idx = $(this).data('index');
-                renderEventDetail(currentKillsData[idx]);
+                renderEventDetail(currentModalEvents[idx]);
             });
         }
 
@@ -385,7 +440,7 @@
             function buildGearGrid(equip, color) {
                 if (!equip) return '<div class="text-muted small">No Gear</div>';
                 return `
-                    <div class="d-flex flex-wrap justify-content-center" style="width: 200px; margin: 0 auto;">
+                    <div class="d-flex flex-wrap justify-content-center gear-container">
                         ${itemHtml(equip.Bag, color)}
                         ${itemHtml(equip.Head, color)}
                         ${itemHtml(equip.Cape, color)}
@@ -399,20 +454,19 @@
                     </div>
                 `;
             }
-
             var html = `
-                <button class="btn btn-sm btn-outline-secondary mb-3" id="backToVictims">&larr; Back to List</button>
-                <div class="row">
-                    <div class="col-6 text-center border-end">
-                        <h6 class="text-primary">${k.Name}</h6>
-                        <small>${k.GuildName}</small>
+                <button class="btn btn-sm btn-outline-secondary mb-3" id="backToList">&larr; Back to List</button>
+                <div class="row g-3">
+                    <div class="col-12 col-md-6 text-center border-end-md">
+                        <h6 class="text-primary">Killer: ${k.Name}</h6>
+                        <small class="d-block mb-2 text-muted">${k.GuildName}</small>
                         <div class="mt-2">
                             ${buildGearGrid(k.Equipment, 'hsla(145, 100%, 50%, 0.2)')}
                         </div>
                     </div>
-                    <div class="col-6 text-center">
-                        <h6 class="text-danger">${v.Name}</h6>
-                        <small>${v.GuildName}</small>
+                    <div class="col-12 col-md-6 text-center border-top border-md-top-0 pt-3 pt-md-0">
+                        <h6 class="text-danger">Victim: ${v.Name}</h6>
+                        <small class="d-block mb-2 text-muted">${v.GuildName}</small>
                         <div class="mt-2">
                             ${buildGearGrid(v.Equipment, 'hsla(0, 80%, 43%, 0.2)')}
                         </div>
@@ -441,8 +495,8 @@
 
             $('#killsModalBody').html(html);
 
-            $('#backToVictims').click(function() {
-                renderVictimList();
+            $('#backToList').click(function() {
+                renderModalList();
             });
         }
     });
@@ -498,6 +552,10 @@
             if (currentSort === 'Kills') {
                 valA = valA ? valA.length : 0;
                 valB = valB ? valB.length : 0;
+            } else if (currentSort === 'Deaths') {
+                 // For sorting, use the integer count
+                 valA = (valA === undefined) ? 0 : valA;
+                 valB = (valB === undefined) ? 0 : valB;
             } else {
                 if (valA === undefined || valA === null) valA = 0;
                 if (valB === undefined || valB === null) valB = 0;
@@ -531,9 +589,18 @@
                 ? `<span class="badge bg-primary kill-count-btn" data-player-id="${p.Id}">${killCount}</span>`
                 : `<span class="badge bg-primary">0</span>`;
             
+            var deathCount = (p.DeathEvents && p.DeathEvents.length > 0) ? p.DeathEvents.length : p.Deaths;
+            var deathBadge;
+            if (p.DeathEvents && p.DeathEvents.length > 0) {
+                 deathBadge = `<span class="badge bg-danger death-count-btn" data-player-id="${p.Id}">${deathCount}</span>`;
+            } else if (deathCount > 0) {
+                 deathBadge = `<span class="badge bg-danger">${deathCount}</span>`;
+            } else {
+                 deathBadge = `<span class="badge bg-danger">0</span>`;
+            }
+
             var damageVal = p.Damage > 0 ? `<span class="text-danger">${Number(p.Damage).toLocaleString()}</span>` : `<span class="text-danger">0</span>`;
             var healVal = p.Healing > 0 ? `<span class="text-success">${Number(p.Healing).toLocaleString()}</span>` : `<span class="text-success">0</span>`;
-            var deathVal = p.Deaths > 0 ? `<span class="badge bg-danger">${p.Deaths}</span>` : `<span class="badge bg-danger">0</span>`;
             var fameVal = `<span class="badge bg-warning text-dark">${Number(p.KillFame).toLocaleString()}</span>`;
 
             var allianceHtml = p.AllianceName ? `<br><small class="text-muted"><span class="badge bg-secondary text-white">${p.AllianceName}</span></small>` : '';
@@ -552,7 +619,7 @@
                     <td class="text-center">${damageVal}</td>
                     <td class="text-center">${healVal}</td>
                     <td class="text-center">${killBadge}</td>
-                    <td class="text-center">${deathVal}</td>
+                    <td class="text-center">${deathBadge}</td>
                     <td class="text-end">${fameVal}</td>
                 </tr>
             `;
@@ -614,7 +681,6 @@
     }
 
     function sortAndRenderGuilds() {
-        // Update Icons
         $('.sort-link span[id^="gSortIcon-"]').text('');
         var icon = (currentGuildOrder === 'desc') ? '▼' : '▲';
         $('#gSortIcon-' + currentGuildSort).text(icon);
