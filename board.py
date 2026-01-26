@@ -32,20 +32,7 @@ def get_scheduler_status(key='scheduler_status'):
         return {'last_check': 'Waiting...', 'next_run': time.time()}
     return status
 
-# --- EVENTS LOGIC ---
-def fetch_event_ids():
-    try:
-        response = requests.get('https://gameinfo-sgp.albiononline.com/api/gameinfo/events', 
-                              params={'offset': 0, 'limit': 50}, 
-                              timeout=10)
-        if response.status_code == 200:
-            data = response.json()
-            return set(event['EventId'] for event in data)
-        return set()
-    except Exception as e:
-        print(f"Error fetching IDs: {e}")
-        return set()
-    
+# --- EVENTS LOGIC (Helpers for Fallback) ---
 def fetch_event_details(event_id):
     try:
         response = requests.get(f'https://gameinfo-sgp.albiononline.com/api/gameinfo/events/{event_id}', timeout=10)
@@ -54,45 +41,8 @@ def fetch_event_details(event_id):
     except Exception: pass
     return None
 
-def fetch_and_check_events():
-    api_ids = fetch_event_ids()
-    if not api_ids: return
-    existing_cursor = events_collection.find(
-        {'EventId': {'$in': list(api_ids)}},
-        {'EventId': 1}
-    )
-    existing_ids = set(doc['EventId'] for doc in existing_cursor)
-    new_ids = api_ids - existing_ids
-
-    if new_ids:
-        print(f"Found {len(new_ids)} new events. Fetching details...")
-        for event_id in new_ids:
-            event_details = fetch_event_details(event_id)
-            if event_details:
-                try:
-                    try:
-                        dt_object = datetime.fromisoformat(event_details['TimeStamp'].replace('Z', '+00:00'))
-                    except ValueError:
-                        dt_object = datetime.now(timezone.utc)
-                    event_details['CreatedAt'] = datetime.now(timezone.utc)
-
-                    events_collection.update_one(
-                        {'EventId': event_details['EventId']},
-                        {'$set': event_details},
-                        upsert=True,
-                    )
-                except Exception as e:
-                    print(f"DB Error: {e}")
-        print("Update complete.")
-
 # --- BATTLES LOGIC ---
 def fetch_battles_data(sort_type='recent', time_range='week', limit=50, offset=0):
-    """
-    range: day | week | month
-    limit: 1 - 50 (API usually caps at 50 per request)
-    offset: 0 - 9999
-    sort: totalFame | totalKills | recent
-    """
     try:
         base_url = "https://gameinfo-sgp.albiononline.com/api/gameinfo/battles"
         params = {
@@ -185,7 +135,6 @@ def fetch_battles_data(sort_type='recent', time_range='week', limit=50, offset=0
         print(f"Error fetching battles: {e}")
 
 def fetch_full_battle_history(battle_id):
-    """Loops through offsets to get ALL events for a battle with RETRY logic."""
     all_events = []
     offset = 0
     limit = 50
@@ -320,18 +269,6 @@ def get_battle_details_cached(battle_id):
     return players_list
 
 # --- SCHEDULERS ---
-@scheduler.task('interval', id='regular_check', seconds=30, misfire_grace_time=900)
-def scheduled_update_event():
-    with app.app_context():
-        fetch_and_check_events()
-        current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        next_run = time.time() + 30 
-        settings_collection.update_one(
-            {'_id': 'scheduler_status'},
-            {'$set': {'last_check': current_time, 'next_run': next_run}},
-            upsert=True
-        )
-
 @scheduler.task('interval', id='battle_check', seconds=90, misfire_grace_time=900)
 def scheduled_update_battles():
     with app.app_context():
@@ -347,26 +284,6 @@ def scheduled_update_battles():
         )
 
 # --- HELPERS ---
-def get_latest_events():
-    datas = events_collection.find().sort("TimeStamp", -1).limit(50)
-    processed_datas = []
-    for event in datas:
-        try:
-            timestamp = datetime.fromisoformat(event['TimeStamp'].replace('Z', '+00:00'))
-        except ValueError:
-            timestamp = event['TimeStamp']
-
-        processed_event = {
-            'EventId': event['EventId'],
-            'TimeStamp': timestamp.strftime('%Y-%m-%d %H:%M:%S') if isinstance(timestamp, datetime) else str(timestamp),
-            'KillerName': event['Killer']['Name'],
-            'KillerId': event['Killer']['Id'],
-            'VictimName': event['Victim']['Name'],
-            'VictimId': event['Victim']['Id']
-        }
-        processed_datas.append(processed_event)
-    return processed_datas
-
 def fetch_player_from_api(player_id):
     player_info = {}
     kills = []
@@ -454,30 +371,6 @@ def calculate_estimated_loss(victim_data):
     return int(total_est_value)
 
 # --ROUTES ---
-@app.route("/")
-@app.route("/home")
-def home():
-    datas = events_collection.find().sort("TimeStamp", -1).limit(50)
-    processed_datas = []
-    for event in datas:
-        try:
-            timestamp = datetime.fromisoformat(event['TimeStamp'].replace('Z', '+00:00'))
-        except ValueError:
-            timestamp = event['TimeStamp']
-        processed_event = {**event, 'TimeStamp': timestamp}
-        processed_datas.append(processed_event)
-    status = get_scheduler_status()
-    return render_template('home.html', datas=processed_datas, last_update=status.get('last_check'), next_update_ts=status.get('next_run'))
-
-@app.route("/events/<int:event_id>")
-def events(event_id):
-    data = list(events_collection.find({'EventId': event_id}))
-    if not data:
-        details = fetch_event_details(event_id)
-        if details: data = [details]
-    estimated_loss = 0
-    if data: estimated_loss = calculate_estimated_loss(data[0]['Victim'])
-    return render_template('events.html', events=data, estimated_loss=estimated_loss)
 
 @app.route("/battles")
 def battles():
@@ -520,6 +413,32 @@ def battles():
                            search_query=search_query,
                            last_update=status.get('last_check'), 
                            next_update_ts=status.get('next_run'))
+
+# FIX: Define 'home' endpoint to satisfy url_for('home') in templates
+@app.route("/")
+@app.route("/home")
+def home():
+    return battles()
+
+@app.route("/events/<int:event_id>")
+def events(event_id):
+    # 1. Try to find in DB (populated by Bot)
+    data = list(events_collection.find({'EventId': event_id}))
+    
+    # 2. Fallback: If bot hasn't fetched it yet, fetch manually
+    if not data:
+        details = fetch_event_details(event_id)
+        if details: data = [details]
+    
+    estimated_loss = 0
+    if data: 
+        # If the bot already calculated loss, use it. Otherwise calculate now.
+        if 'EstimatedVictimLootValue' in data[0]:
+            estimated_loss = data[0]['EstimatedVictimLootValue']
+        else:
+            estimated_loss = calculate_estimated_loss(data[0]['Victim'])
+            
+    return render_template('events.html', events=data, estimated_loss=estimated_loss)
 
 @app.route('/api/battles_list')
 def api_battles_list():
@@ -646,12 +565,6 @@ def battle_details(battle_id):
 def player(player_id):
     data = get_player_data(player_id)
     return render_template('player.html', **data)
-
-@app.route('/api/updates')
-def api_updates():
-    latest_events = get_latest_events()
-    status = get_scheduler_status()
-    return jsonify({'events': latest_events, 'last_update': status.get('last_check'), 'next_update_ts': status.get('next_run')})
 
 @app.route('/api/search')
 def search_proxy():
