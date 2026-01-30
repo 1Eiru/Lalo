@@ -41,16 +41,18 @@ def fetch_event_details(event_id):
     except Exception: pass
     return None
 
+
 # --- BATTLES LOGIC ---
-def fetch_battles_data(sort_type='recent', time_range='week', limit=50, offset=0):
+def fetch_battles_data(sort_type='recent', time_range='week', limit=51, offset=0):
     try:
-        base_url = "https://gameinfo-sgp.albiononline.com/api/gameinfo/battles"
-        params = {
-            'range': time_range,
-            'limit': limit,
-            'offset': offset,
-            'sort': sort_type
-        }
+        base_url = "https://gameinfo-sgp.albiononline.com/api/gameinfo/battles"       
+        # Changed to list of tuples to enforce exact order: range -> offset -> limit -> sort
+        params = [
+            ('range', time_range),
+            ('offset', offset),
+            ('limit', limit),
+            ('sort', sort_type)
+        ]
         
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.159 Safari/537.36'
@@ -277,8 +279,7 @@ def get_battle_details_cached(battle_id):
 def scheduled_update_battles():
     with app.app_context():
         print("Scheduler: Battles running...")
-        fetch_battles_data(sort_type='recent', time_range='week', limit=50)
-        
+        fetch_battles_data(sort_type='recent', time_range='week', limit=51)        
         current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         next_run = time.time() + 90
         settings_collection.update_one(
