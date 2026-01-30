@@ -51,8 +51,12 @@ def fetch_battles_data(sort_type='recent', time_range='week', limit=50, offset=0
             'offset': offset,
             'sort': sort_type
         }
+        
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.159 Safari/537.36'
+        }
 
-        response = requests.get(base_url, params=params, timeout=15)
+        response = requests.get(base_url, params=params, headers=headers, timeout=15)
         
         if response.status_code == 200:
             battles = response.json()
@@ -414,7 +418,6 @@ def battles():
                            last_update=status.get('last_check'), 
                            next_update_ts=status.get('next_run'))
 
-# FIX: Define 'home' endpoint to satisfy url_for('home') in templates
 @app.route("/")
 @app.route("/home")
 def home():
@@ -422,17 +425,13 @@ def home():
 
 @app.route("/events/<int:event_id>")
 def events(event_id):
-    # 1. Try to find in DB (populated by Bot)
     data = list(events_collection.find({'EventId': event_id}))
-    
-    # 2. Fallback: If bot hasn't fetched it yet, fetch manually
     if not data:
         details = fetch_event_details(event_id)
         if details: data = [details]
     
     estimated_loss = 0
     if data: 
-        # If the bot already calculated loss, use it. Otherwise calculate now.
         if 'EstimatedVictimLootValue' in data[0]:
             estimated_loss = data[0]['EstimatedVictimLootValue']
         else:
