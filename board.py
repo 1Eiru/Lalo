@@ -1,5 +1,8 @@
-from flask import Flask, render_template, jsonify, request
-from pymongo import MongoClient, ASCENDING, DESCENDING
+from flask import Flask, render_template, jsonify, request, abort
+import re 
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from pymongo import MongoClient, ASCENDING, DESCENDING, TEXT 
 from datetime import datetime, timezone
 from flask_apscheduler import APScheduler
 import requests, os, time, math
@@ -8,6 +11,15 @@ app = Flask(__name__)
 scheduler = APScheduler()
 scheduler.init_app(app)
 scheduler.start()
+
+# 1. Setup Rate Limiting
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=["2000 per day", "200 per hour"], 
+    storage_uri="memory://"
+)
+
 
 mongoURI = os.getenv('MONGODB_URI')
 client = MongoClient(mongoURI)
@@ -25,6 +37,13 @@ events_collection.create_index([("CreatedAt", ASCENDING)], expireAfterSeconds=18
 battles_collection.create_index([("endTime", DESCENDING)]) 
 cache_collection.create_index([("last_updated", ASCENDING)], expireAfterSeconds=300)
 battles_cache.create_index([("createdAt", ASCENDING)], expireAfterSeconds=3600)
+
+# --- NEW INDEX (THE FIX) ---
+# This creates a specialized index for searching words inside these arrays
+battles_collection.create_index([
+    ("player_names", TEXT),
+    ("guild_names", TEXT)
+], name="battle_search_index")
 
 def get_scheduler_status(key='scheduler_status'):
     status = settings_collection.find_one({'_id': key})
@@ -441,37 +460,47 @@ def events(event_id):
     return render_template('events.html', events=data, estimated_loss=estimated_loss)
 
 @app.route('/api/battles_list')
+@limiter.limit("60 per minute")
 def api_battles_list():
-    page = request.args.get('page', 1, type=int)
+    # --- 1. Security: Validate Pagination ---
+    try:
+        page = int(request.args.get('page', 1))
+    except ValueError:
+        page = 1
+    
+    if page < 1: page = 1
+    if page > 200:
+        return jsonify({'error': 'Page limit exceeded. Please refine your search.'}), 400
+
+    # --- 2. Security: Sanitize Search Input ---
     search_query = request.args.get('search', '').strip()
+    
+    if search_query and not search_query.isdigit() and len(search_query) < 3:
+        return jsonify({'error': 'Search query must be at least 3 characters.'}), 400
+
     per_page = 25
     skip_amount = (page - 1) * per_page 
     base_query = {'totalFame': {'$gt': 100000}}
 
     if search_query:
-        search_filter = {}
         if search_query.isdigit():
-             search_filter = {
-                "$or": [
-                    {'id': int(search_query)},
-                    {"player_names": {"$regex": search_query, "$options": "i"}},
-                    {"guild_names": {"$regex": search_query, "$options": "i"}}
-                ]
-            }
+             search_filter = {'id': int(search_query)}
+             mongo_query = {"$and": [base_query, search_filter]}
         else:
             search_filter = {
-                "$or": [
-                    {"player_names": {"$regex": search_query, "$options": "i"}},
-                    {"guild_names": {"$regex": search_query, "$options": "i"}}
-                ]
+                "$text": { "$search": f'"{search_query}"' } 
             }
-        mongo_query = {"$and": [base_query, search_filter]}
+            mongo_query = {"$and": [base_query, search_filter]}
     else:
         mongo_query = base_query
 
+    # --- 4. Execution ---
     total_battles = battles_collection.count_documents(mongo_query)
     total_pages = math.ceil(total_battles / per_page)
+    
+    # Sort by endTime descending
     battles_cursor = battles_collection.find(mongo_query).sort("endTime", -1).skip(skip_amount).limit(per_page)
+    
     battles_data = []
     
     for b in battles_cursor:
@@ -567,13 +596,22 @@ def player(player_id):
     return render_template('player.html', **data)
 
 @app.route('/api/search')
+@limiter.limit("20 per minute")
 def search_proxy():
     query = request.args.get('q', '')
-    if not query or len(query) < 2: return jsonify({'players': []})
+    
+    # Validation
+    if not query or len(query) < 2: 
+        return jsonify({'players': []})
+    
+    # Optional: Whitelist characters (Only allow letters, numbers, spaces)
+    if not re.match("^[a-zA-Z0-9 ]+$", query):
+        return jsonify({'players': []})
+
     try:
         url = f"https://gameinfo-sgp.albiononline.com/api/gameinfo/search?q={query}"
         headers = {'User-Agent': 'Mozilla/5.0'} 
-        response = requests.get(url, headers=headers, timeout=5)
+        response = requests.get(url, headers=headers, timeout=3) 
         if response.status_code == 200: return jsonify(response.json())     
     except Exception: pass   
     return jsonify({'players': []})
