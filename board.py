@@ -26,14 +26,14 @@ client = MongoClient(mongoURI)
 db = client.flask_database
 
 # Collections
-events_collection = db.events
+#events_collection = db.events
 battles_collection = db.battles
 battles_cache = db.battles_cache  
 settings_collection = db.settings
 cache_collection = db.player_cache
 
 # Indexes
-events_collection.create_index([("CreatedAt", ASCENDING)], expireAfterSeconds=1800)
+#events_collection.create_index([("CreatedAt", ASCENDING)], expireAfterSeconds=1800)
 battles_collection.create_index([("endTime", DESCENDING)]) 
 cache_collection.create_index([("last_updated", ASCENDING)], expireAfterSeconds=300)
 battles_cache.create_index([("createdAt", ASCENDING)], expireAfterSeconds=3600)
