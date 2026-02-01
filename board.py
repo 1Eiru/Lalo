@@ -26,7 +26,7 @@ client = MongoClient(mongoURI)
 db = client.flask_database
 
 # Collections
-#events_collection = db.events
+events_collection = db.events
 battles_collection = db.battles
 battles_cache = db.battles_cache  
 settings_collection = db.settings
@@ -38,7 +38,7 @@ battles_collection.create_index([("endTime", DESCENDING)])
 cache_collection.create_index([("last_updated", ASCENDING)], expireAfterSeconds=300)
 battles_cache.create_index([("createdAt", ASCENDING)], expireAfterSeconds=3600)
 
-# --- NEW INDEX (THE FIX) ---
+
 # This creates a specialized index for searching words inside these arrays
 battles_collection.create_index([
     ("player_names", TEXT),
