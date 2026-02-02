@@ -5,7 +5,7 @@
 ![](images/three.png)
 ![](images/four.png)
 
-#discord.py 
+# discord.py 
 ![](images/kill.png)
 ![](images/death.png)
 ![](images/assist.png)
