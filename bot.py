@@ -16,6 +16,11 @@ load_dotenv()
 TOKEN = os.getenv('DISCORD_BOT_TOKEN')
 MONGO_URI = os.getenv('MONGODB_URI')
 CHANNEL_ID = None
+API_HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Accept': 'application/json, text/plain, */*',
+    'Accept-Language': 'en-US,en;q=0.9'
+}
 
 # --- DATABASE ---
 client = MongoClient(MONGO_URI)
@@ -53,6 +58,7 @@ class KillboardBot(commands.Bot):
         intents = discord.Intents.default()
         intents.message_content = True
         super().__init__(command_prefix="!", intents=intents)
+        self.is_scanning = False
 
     async def setup_hook(self):
         self.ingest_events.start()
@@ -62,89 +68,95 @@ class KillboardBot(commands.Bot):
     async def on_ready(self):
         log(f'Logged in as {self.user}')
 
-# --- TASK 1: DEEP INGESTION [60s) ---
-    @tasks.loop(seconds=60)
+# ---INGESTION [20s] ---
+    @tasks.loop(seconds=20)
     async def ingest_events(self):
         await self.wait_until_ready()
-        log("🔄 Starting Deep Scan Cycle...")
+        if self.is_scanning:
+            log("⚠️ Previous scan still running. Skipping this tick.")
+            return
+        self.is_scanning = True
         
-        tracked_cursor = tracked_collection.find({}, {'name': 1})
-        tracked_names = {doc['name'].lower() for doc in tracked_cursor}
-        
-        log(f"📋 Tracking {len(tracked_names)} players.")
-        
-        if not tracked_names:
-            log("⚠️ No players to track. Skipping API calls.")
-            return 
+        try:
+            log("🔄 Starting Deep Scan Cycle...")  
+            tracked_cursor = tracked_collection.find({}, {'name': 1})
+            tracked_names = {doc['name'].lower() for doc in tracked_cursor}            
+            log(f"📋 Tracking {len(tracked_names)} players.")
+            
+            if not tracked_names:
+                log("⚠️ No players to track. Skipping API calls.")
+                return 
 
-        async with aiohttp.ClientSession() as session:
-            for offset in range(0, 1001, 51):
-                try:
-                    url = f'https://gameinfo-sgp.albiononline.com/api/gameinfo/events?offset={offset}&limit=51'
-                    log(f"🔎 Scanning Offset {offset}...") 
-                    
-                    async with session.get(url) as resp:
-                        if resp.status != 200:
-                            log(f"❌ API Error {resp.status} at offset {offset}")
-                            break
-                        
-                        api_data = await resp.json()
-                        if not api_data:
-                            log("   -> End of stream.")
-                            break
+            async with aiohttp.ClientSession() as session:
+                for offset in range(0, 1001, 51):
+                    try:
+                        url = f"https://gameinfo-sgp.albiononline.com/api/gameinfo/events?limit=51&offset={offset}&sort=recent"
+                        log(f"🔎 Scanning Offset {offset}...") 
 
-                        events_to_save = []
-                        
-                        for event in api_data:
-
-                            if event.get('TotalVictimKillFame', 0) == 0:
-                                continue
-
-                            eid = event['EventId']
-                            k_name = event['Killer']['Name'].lower()
-                            v_name = event['Victim']['Name'].lower()
+                        async with session.get(url, headers=API_HEADERS) as resp:
+                            if resp.status != 200:
+                                log(f"❌ API Error {resp.status} at offset {offset}")
+                                break
                             
-                            # Check participants for tracked players
-                            participants = [p['Name'].lower() for p in event.get('Participants', [])]
-                            is_tracked_participant = any(p in tracked_names for p in participants)
+                            api_data = await resp.json()
+                            if not api_data:
+                                log("   -> End of stream.")
+                                break
+
+                            events_to_save = []
                             
-                            if k_name in tracked_names or v_name in tracked_names or is_tracked_participant:
-                                if not events_collection.find_one({'EventId': eid}, {'_id': 1}):
-                                    log(f"   -> 🎯 Found NEW Tracked Event! ID: {eid} ({k_name} vs {v_name})")
-                                    
-                                    try:
-                                        event['CreatedAt'] = datetime.fromisoformat(event['TimeStamp'].replace('Z', '+00:00'))
-                                    except:
-                                        event['CreatedAt'] = datetime.now(timezone.utc)
-                                    
-                                    event['processed'] = False
-                                    events_to_save.append(event)
+                            for event in api_data:
 
-                        if events_to_save:
-                            events_to_save.sort(key=lambda x: x['EventId'])
-                            try:
-                                events_collection.insert_many(events_to_save, ordered=False)
-                                log(f"📥 Saved {len(events_to_save)} events to DB.")
-                            except Exception as e:
-                                log(f"   -> Insert warning: {e}")
+                                if event.get('TotalVictimKillFame', 0) == 0:
+                                    continue
 
-                except Exception as e:
-                    log(f"❌ Ingestion Exception at offset {offset}: {e}")
-                    break
-                
-                await asyncio.sleep(0.8)
+                                eid = event['EventId']
+                                k_name = event['Killer']['Name'].lower()
+                                v_name = event['Victim']['Name'].lower()
+                                
+                                # Check participants for tracked players
+                                participants = [p['Name'].lower() for p in event.get('Participants', [])]
+                                is_tracked_participant = any(p in tracked_names for p in participants)
+                                
+                                if k_name in tracked_names or v_name in tracked_names or is_tracked_participant:
+                                    if not events_collection.find_one({'EventId': eid}, {'_id': 1}):
+                                        log(f"   -> 🎯 Found NEW Tracked Event! ID: {eid} ({k_name} vs {v_name})")
+                                        
+                                        try:
+                                            event['CreatedAt'] = datetime.fromisoformat(event['TimeStamp'].replace('Z', '+00:00'))
+                                        except:
+                                            event['CreatedAt'] = datetime.now(timezone.utc)
+                                        
+                                        event['processed'] = False
+                                        events_to_save.append(event)
 
-        current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        next_run = datetime.now().timestamp() + 60
-        settings_collection.update_one(
-            {'_id': 'scheduler_status'},
-            {'$set': {'last_check': current_time, 'next_run': next_run}},
-            upsert=True
-        )
-        log("✅ Scan Complete.")
+                            if events_to_save:
+                                events_to_save.sort(key=lambda x: x['EventId'])
+                                try:
+                                    events_collection.insert_many(events_to_save, ordered=False)
+                                    log(f"📥 Saved {len(events_to_save)} events to DB.")
+                                except Exception as e:
+                                    log(f"   -> Insert warning: {e}")
+
+                    except Exception as e:
+                        log(f"❌ Ingestion Exception at offset {offset}: {e}")
+                        break
+                    await asyncio.sleep(0.3)
+
+            current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            next_run = datetime.now().timestamp() + 20
+            settings_collection.update_one(
+                {'_id': 'scheduler_status'},
+                {'$set': {'last_check': current_time, 'next_run': next_run}},
+                upsert=True
+            )
+            log("✅ Scan Complete.")
+            
+        finally:
+            self.is_scanning = False
 
 
-# --- TASK 2: PROCESSING ---
+# ---PROCESSING ---
     @tasks.loop(seconds=5) 
     async def process_events_queue(self):
         await self.wait_until_ready()
@@ -216,13 +228,12 @@ async def event(ctx, event_id: int):
     
     async with aiohttp.ClientSession() as session:
         try:
-            async with session.get(url) as resp:
+            async with session.get(url, headers=API_HEADERS) as resp:
                 if resp.status != 200:
                     await ctx.send(f"❌ API Error: {resp.status}")
-                    return
-                
+                    return               
                 event_data = await resp.json()
-                
+
                 try:
                     event_data['CreatedAt'] = datetime.fromisoformat(event_data['TimeStamp'].replace('Z', '+00:00'))
                 except:
@@ -299,7 +310,7 @@ async def get_estimated_value(session, victim_data):
     url = f"https://east.albion-online-data.com/api/v2/stats/prices/{item_str}.json?locations={locations}&qualities=1,2,3,4,5"
     
     try:
-        async with session.get(url) as resp:
+        async with session.get(url, headers=API_HEADERS) as resp:
             if resp.status != 200: return 0
             price_data = await resp.json()
     except Exception: return 0
@@ -331,7 +342,7 @@ async def get_estimated_value(session, victim_data):
 # --- IMAGE GENERATION ---
 async def fetch_image(session, url):
     try:
-        async with session.get(url) as resp:
+        async with session.get(url, headers=API_HEADERS) as resp:
             if resp.status == 200:
                 data = await resp.read()
                 return Image.open(BytesIO(data)).convert("RGBA")
@@ -604,8 +615,6 @@ def create_embed(doc, est_value):
     
     is_kill = k['Name'].lower() in tracked_names
     is_death = v['Name'].lower() in tracked_names
-    
-    # Find if a tracked player is a participant (but not killer/victim)
     tracked_participant_name = next((p['Name'] for p in doc.get('Participants', []) if p['Name'].lower() in tracked_names), None)
     
     # --- TITLE & COLOR ---
@@ -637,17 +646,14 @@ def create_embed(doc, est_value):
         p_name = p.get('Name')
         p_id = p.get('Id')
         
-        # FILTER: Exclude the Killer from the participants list
         if p_name == k['Name']:
             continue
 
         if p_name and p_id:
-            # Bolded name with hyperlink
             link = f"[**{p_name}**](https://lalo-kb.onrender.com/player/{p_id})"
             participant_links.append(link)
 
     if participant_links:
-        # Limit to the first 6 participants to keep the message clean
         display_limit = 6
         displayed_names = participant_links[:display_limit]
         remaining_count = len(participant_links) - display_limit
@@ -659,7 +665,6 @@ def create_embed(doc, est_value):
     else:
         participants_value = "Solo"
 
-    # Keeps label and names on the same line
     embed.description = f"**Participants:** {participants_value}"
     
     # --- TIMESTAMP & FOOTER ---
