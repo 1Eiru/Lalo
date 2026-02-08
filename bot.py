@@ -73,29 +73,29 @@ class KillboardBot(commands.Bot):
     async def ingest_events(self):
         await self.wait_until_ready()
         if self.is_scanning:
-            log("⚠️ Previous scan still running. Skipping this tick.")
+            log("Previous scan still running. Skipping this tick.")
             return
         self.is_scanning = True
         
         try:
-            log("🔄 Starting Deep Scan Cycle...")  
+            log("Starting Deep Scan Cycle...")  
             tracked_cursor = tracked_collection.find({}, {'name': 1})
             tracked_names = {doc['name'].lower() for doc in tracked_cursor}            
-            log(f"📋 Tracking {len(tracked_names)} players.")
+            log(f"Tracking {len(tracked_names)} players.")
             
             if not tracked_names:
-                log("⚠️ No players to track. Skipping API calls.")
+                log("No players to track. Skipping API calls.")
                 return 
 
             async with aiohttp.ClientSession() as session:
                 for offset in range(0, 1001, 51):
                     try:
                         url = f"https://gameinfo-sgp.albiononline.com/api/gameinfo/events?limit=51&offset={offset}&sort=recent"
-                        log(f"🔎 Scanning Offset {offset}...") 
+                        log(f"Scanning Offset {offset}...") 
 
                         async with session.get(url, headers=API_HEADERS) as resp:
                             if resp.status != 200:
-                                log(f"❌ API Error {resp.status} at offset {offset}")
+                                log(f"API Error {resp.status} at offset {offset}")
                                 break
                             
                             api_data = await resp.json()
@@ -120,7 +120,7 @@ class KillboardBot(commands.Bot):
                                 
                                 if k_name in tracked_names or v_name in tracked_names or is_tracked_participant:
                                     if not events_collection.find_one({'EventId': eid}, {'_id': 1}):
-                                        log(f"   -> 🎯 Found NEW Tracked Event! ID: {eid} ({k_name} vs {v_name})")
+                                        log(f"   -> Found NEW Tracked Event! ID: {eid} ({k_name} vs {v_name})")
                                         
                                         try:
                                             event['CreatedAt'] = datetime.fromisoformat(event['TimeStamp'].replace('Z', '+00:00'))
@@ -134,12 +134,12 @@ class KillboardBot(commands.Bot):
                                 events_to_save.sort(key=lambda x: x['EventId'])
                                 try:
                                     events_collection.insert_many(events_to_save, ordered=False)
-                                    log(f"📥 Saved {len(events_to_save)} events to DB.")
+                                    log(f"Saved {len(events_to_save)} events to DB.")
                                 except Exception as e:
                                     log(f"   -> Insert warning: {e}")
 
                     except Exception as e:
-                        log(f"❌ Ingestion Exception at offset {offset}: {e}")
+                        log(f"Ingestion Exception at offset {offset}: {e}")
                         break
                     await asyncio.sleep(0.3)
 
@@ -150,7 +150,7 @@ class KillboardBot(commands.Bot):
                 {'$set': {'last_check': current_time, 'next_run': next_run}},
                 upsert=True
             )
-            log("✅ Scan Complete.")
+            log("Scan Complete.")
             
         finally:
             self.is_scanning = False
@@ -172,11 +172,11 @@ class KillboardBot(commands.Bot):
         queue = list(events_collection.find({'processed': False}).sort('EventId', 1).limit(5))
         if not queue: return
 
-        log(f"⚙️ Processing Queue: {len(queue)} pending events...")
+        log(f"Processing Queue: {len(queue)} pending events...")
         
         channel = self.get_channel(CHANNEL_ID)
         if not channel: 
-            log(f"❌ Error: Discord Channel ID {CHANNEL_ID} not found or bot lacks access.")
+            log(f"Error: Discord Channel ID {CHANNEL_ID} not found or bot lacks access.")
             return
 
         async with aiohttp.ClientSession() as session:
@@ -208,10 +208,10 @@ class KillboardBot(commands.Bot):
                     'posted_at': datetime.now(timezone.utc)
                 }}
             )
-            log(f"   -> ✅ Posted Event #{eid}")
+            log(f"   -> Posted Event #{eid}")
 
         except Exception as e:
-            log(f"❌ ERROR processing {eid}: {e}")
+            log(f"ERROR processing {eid}: {e}")
             events_collection.update_one({'EventId': eid}, {'$set': {'processed': True, 'error': str(e)}})
 
 # --- INITIALIZE BOT ---
@@ -230,7 +230,7 @@ async def event(ctx, event_id: int):
         try:
             async with session.get(url, headers=API_HEADERS) as resp:
                 if resp.status != 200:
-                    await ctx.send(f"❌ API Error: {resp.status}")
+                    await ctx.send(f"API Error: {resp.status}")
                     return               
                 event_data = await resp.json()
 
@@ -249,7 +249,7 @@ async def event(ctx, event_id: int):
                 await ctx.send(embed=embed, file=file)
                 
         except Exception as e:
-            await ctx.send(f"❌ Error: {e}")
+            await ctx.send(f"Error: {e}")
 
 @bot.command()
 async def track(ctx, name: str):
@@ -349,7 +349,37 @@ async def fetch_image(session, url):
     except: pass
     return None
 
+def apply_transparency(img, alpha_float):
+    if img.mode != 'RGBA':
+        img = img.convert('RGBA')
+    r, g, b, a = img.split()
+    a = a.point(lambda p: int(p * alpha_float))
+    return Image.merge('RGBA', (r, g, b, a))
+
 async def generate_versus_image(session, doc):
+    # --- IMAGE CONF ---
+    IMG_CONFIGS = {
+        'killer_mewing': {
+            'width': 180,       # Width of the image 
+            'opacity': 0.6,     # 0.0 to 1.0
+            'x_offset': 0,      # Move Left (-) or Right (+)
+            'y_offset': 0       # Move Up (-) or Down (+)
+        },
+        'killer_mogs': {        # Killer's Head
+            'size': 120,        # Square size (160x160)
+            'opacity': 0.5,
+            'x_offset': 0,      # Move Left (-) or Right (+)
+            'y_offset': -30     # Move Up (-) or Down (+)
+        },
+        'jackass': {            # Victim's Head
+            'size': 120,        # Square size (160x160)
+            'opacity': 0.7,
+            'x_offset': 0,      # Move Left (-) or Right (+)
+            'y_offset': -19     # Move Up (-) or Down (+)
+        }
+    }
+    # ---------------------------------------
+
     killer = doc['Killer']
     victim = doc['Victim']
     participants = [p for p in doc.get('Participants', []) if p['Name'] != killer['Name']]
@@ -371,65 +401,85 @@ async def generate_versus_image(session, doc):
     ANATOMY_H = 433
     ICON_SIZE = 100 
     
-    # Coordinates
     SLOT_COORDS = {
-        'Bag':      (20, 28),    
-        'Head':     (150, 37),   
-        'Cape':     (279, 28),   
-        'MainHand': (44, 130),   
-        'Armor':    (150, 130),  
-        'OffHand':  (259, 130),  
-        'Food':     (279, 237),  
-        'Potion':   (23, 237),   
-        'Shoes':    (150, 224),  
-        'Mount':    (150, 318)   
+        'Bag':      (20, 28), 'Head':     (150, 37), 'Cape':     (279, 28),
+        'MainHand': (44, 130), 'Armor':    (150, 130), 'OffHand':  (259, 130),
+        'Food':     (279, 237), 'Potion':   (23, 237), 'Shoes':    (150, 224),
+        'Mount':    (150, 318)
     }
     
     # Layout Calculations
     padding_x = 40
     header_height = 120 
-    
-    # Inventory Grid
     inv_icon_size = 72
     inv_gap = 5
     inv_cols = 9
     inv_rows = math.ceil(len(inventory_items) / inv_cols) if inventory_items else 0
     inv_section_height = (inv_rows * (inv_icon_size + inv_gap)) + 60 
     
-    # Total Canvas Size
     total_width = (ANATOMY_W * 2) + (padding_x * 3) 
     total_height = header_height + ANATOMY_H + 40 + inv_section_height
     
-    # Create Canvas - Light Beige Background
     bg_color = (190, 157, 106, 255)
     canvas = Image.new('RGBA', (total_width, total_height), bg_color)
     draw = ImageDraw.Draw(canvas)
-    
-    # --- FETCH ASSETS ---
-    bg_url = "https://lalokbimages.b-cdn.net/gear.png"
-    silver_url = "https://lalokbimages.b-cdn.net/bag_of_silver.png"
-    
-    # Overlay Images
-    mogged_url = "https://lalokbimages.b-cdn.net/mogged.png"
-    killer_overlay_url = "https://lalokbimages.b-cdn.net/70c920445f57f6c13cb19fb606789d91.png"
-    mogged_lul_url = "https://lalokbimages.b-cdn.net/moggedlul.png"
-    
-    slots = ['Bag', 'Head', 'Cape', 'MainHand', 'Armor', 'OffHand', 'Potion', 'Shoes', 'Food', 'Mount']
-    tasks = []
-    
-    # 0. Backgrounds & Extras
-    tasks.append(('bg', 0, 'shared', fetch_image(session, bg_url)))
-    tasks.append(('icon', 0, 'silver', fetch_image(session, silver_url)))
-    
-    # --- OVERLAY LOGIC ---
-    # Priority: Victim Tracked (Mogged) > Killer Tracked (Win) > Assist (Win)
-    if is_victim_tracked:
-        tasks.append(('icon', 0, 'overlay', fetch_image(session, mogged_url)))
-        # face overlay task if victim is tracked
-        tasks.append(('icon', 0, 'victim_face', fetch_image(session, mogged_lul_url)))
-    elif is_killer_tracked or is_assist:
-        tasks.append(('icon', 0, 'overlay', fetch_image(session, killer_overlay_url)))
 
+    # --- ASSET (LOCAL) ---
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    ASSETS_DIR = os.path.join(BASE_DIR, 'assets')
+    
+    def load_local_asset(filename):
+        try:
+            path = os.path.join(ASSETS_DIR, filename)
+            if os.path.exists(path):
+                return Image.open(path).convert("RGBA")
+            log(f"Missing asset: {filename}")
+            return None
+        except Exception as e:
+            log(f"Error loading {filename}: {e}")
+            return None
+
+    # Load Static Assets
+    bg_image = load_local_asset("gear.png")
+    silver_image = load_local_asset("bag_of_silver.png")
+    
+    # Determine Overlays
+    overlay_img = None
+    face_img = None
+    
+    # Headgear specific overlays
+    killer_head_overlay = None
+    victim_head_overlay = None
+
+    if is_victim_tracked:
+        overlay_img = load_local_asset("mogged.png")
+        face_img = load_local_asset("moggedlul.png")
+    elif is_killer_tracked:
+        # 1. VS Overlay (Mewing)
+        raw_img = load_local_asset("killer_mewing.png")
+        cfg = IMG_CONFIGS['killer_mewing']
+        if raw_img:
+            overlay_img = apply_transparency(raw_img, cfg['opacity'])
+        
+        # 2. Killer Head (Mogs)
+        raw_k_head = load_local_asset("killer_mogs.png")
+        cfg_k = IMG_CONFIGS['killer_mogs']
+        if raw_k_head:
+            killer_head_overlay = apply_transparency(raw_k_head, cfg_k['opacity'])
+            
+        # 3. Victim Head (Jackass)
+        raw_v_head = load_local_asset("jackass.png")
+        cfg_v = IMG_CONFIGS['jackass']
+        if raw_v_head:
+            victim_head_overlay = apply_transparency(raw_v_head, cfg_v['opacity'])
+
+    elif is_assist:
+        overlay_img = load_local_asset("killer.png") 
+
+    # --- ASSET FETCHING (NETWORK) ---
+    slots = ['Bag', 'Head', 'Cape', 'MainHand', 'Armor', 'OffHand', 'Potion', 'Shoes', 'Food', 'Mount']
+    tasks = [] 
+    
     # 1. Killer Items
     for i, slot in enumerate(slots):
         item = killer.get('Equipment', {}).get(slot)
@@ -453,19 +503,17 @@ async def generate_versus_image(session, doc):
     results = await asyncio.gather(*[t[3] for t in tasks])
     
     # --- DRAWING LOGIC ---
-    # Positioning
     killer_x = padding_x
     victim_x = killer_x + ANATOMY_W + padding_x
     anatomy_y = header_height
     
-    # 1. Paste Gear Backgrounds
-    bg_image = next((img for (t, _, _, _), img in zip(tasks, results) if t == 'bg'), None)
+    # 1. Paste Gear Backgrounds (From Local)
     if bg_image:
         bg_image = bg_image.resize((ANATOMY_W, ANATOMY_H))
         canvas.paste(bg_image, (killer_x, anatomy_y), bg_image)
         canvas.paste(bg_image, (victim_x, anatomy_y), bg_image)
 
-    # 2. Text Headers (Centered)
+    # 2. Text Headers
     def draw_centered_text(text, center_x, y, font, color):
         bbox = draw.textbbox((0, 0), text, font=font)
         w = bbox[2] - bbox[0]
@@ -474,39 +522,42 @@ async def generate_versus_image(session, doc):
     k_center = killer_x + (ANATOMY_W / 2)
     v_center = victim_x + (ANATOMY_W / 2)
 
-    # Killer Header - Dark Blue Name
+    # Killer Header
     draw_centered_text("Killer", k_center, 10, BOLD_FONT, "#00000068")
-    draw_centered_text(killer['Name'], k_center, 45, LARGE_BOLD_FONT, "#003366") 
-    draw_centered_text(f"[{killer.get('GuildName', '')}]", k_center, 90, SMALL_FONT, "#252525")
+    draw_centered_text(killer['Name'], k_center, 45, LARGE_BOLD_FONT, "#003366")
+    if killer.get('GuildName', '') != "":
+        draw_centered_text(f"[{killer.get('GuildName', '')}]", k_center, 90, SMALL_FONT, "#252525")
 
-    # Victim Header - Dark Red Name
+    # Victim Header
     draw_centered_text("Victim", v_center, 10, BOLD_FONT, "#000000")
     draw_centered_text(victim['Name'], v_center, 45, LARGE_BOLD_FONT, "#8B0000")
-    draw_centered_text(f"[{victim.get('GuildName', '')}]", v_center, 90, SMALL_FONT, "#252525")
+    if victim.get('GuildName', '') != "":
+        draw_centered_text(f"[{victim.get('GuildName', '')}]", v_center, 90, SMALL_FONT, "#252525")
     
-    # VS Text
-    vs_x = killer_x + ANATOMY_W + (padding_x / 2)
-    draw_centered_text("VS", vs_x, anatomy_y + (ANATOMY_H // 2) - 40, LARGE_BOLD_FONT, "#FFFFFF")
-
-# --- 1. CALCULATE CENTER X ---
+    # 3. VS Section & Overlay (Local)
     vs_x = killer_x + ANATOMY_W + (padding_x / 2)
 
-    # --- 2. PASTE OVERLAY IMAGE FIRST ---
-    overlay_img = next((img for (t, _, s, _), img in zip(tasks, results) if s == 'overlay'), None)
     if overlay_img:
         m_w, m_h = overlay_img.size
-        target_w = 120 
+        if is_killer_tracked:
+            cfg = IMG_CONFIGS['killer_mewing']
+            target_w = cfg['width']
+            x_off = cfg['x_offset']
+            y_off = cfg['y_offset']
+        else:
+            target_w = 120
+            x_off = 0
+            y_off = 0
+
         ratio = target_w / m_w
         overlay_img = overlay_img.resize((target_w, int(m_h * ratio)))
+        mx = int(vs_x - (target_w / 2)) + x_off
+        my = int(anatomy_y + (ANATOMY_H // 2) - 320) + y_off
         
-        mx = int(vs_x - (target_w / 2))
-        my = int(anatomy_y + (ANATOMY_H // 2) - 320) 
         canvas.paste(overlay_img, (mx, my), overlay_img)
 
-    # --- 3. DRAW "VS" TEXT LAST ---
     draw_centered_text("VS", vs_x, anatomy_y + (ANATOMY_H // 2) - 40, LARGE_BOLD_FONT, "#FFFFFF")
 
-    # 3. Paste Equipment Icons
     for (type_, index, side, _), img in zip(tasks, results):
         if img and type_ == 'equip':
             slot_name = slots[index]
@@ -516,16 +567,37 @@ async def generate_versus_image(session, doc):
                 img = img.resize((ICON_SIZE, ICON_SIZE))
                 canvas.paste(img, (base_x + local_x, anatomy_y + local_y), img)
 
-    # --- NEW: PASTE VICTIM FACE OVERLAY ---
-    face_img = next((img for (t, _, s, _), img in zip(tasks, results) if s == 'victim_face'), None)
+    # 5. Headgear Overlays
+    def paste_head_overlay(overlay_img, base_x, config):
+        if not overlay_img: return
+        
+        target_size = config['size']
+        overlay_img = overlay_img.resize((target_size, target_size))
+        
+        slot_x, slot_y = SLOT_COORDS['Head']
+        
+        slot_center_x = base_x + slot_x + (ICON_SIZE // 2)
+        slot_center_y = anatomy_y + slot_y + (ICON_SIZE // 2)
+
+        paste_x = slot_center_x - (target_size // 2)
+        paste_y = slot_center_y - (target_size // 2)
+        
+        paste_x += config['x_offset']
+        paste_y += config['y_offset']
+        
+        canvas.paste(overlay_img, (paste_x, paste_y), overlay_img)
+
+    if is_killer_tracked:
+        paste_head_overlay(killer_head_overlay, killer_x, IMG_CONFIGS['killer_mogs'])
+        paste_head_overlay(victim_head_overlay, victim_x, IMG_CONFIGS['jackass'])
+
+    # 6. Face Overlay
     if face_img:
-        # Resize to fit the panel width
         target_width = 380
         ratio = target_width / face_img.width
         target_height = int(face_img.height * ratio)
         face_img = face_img.resize((target_width, target_height))
 
-        # Make semi-transparen
         if face_img.mode != 'RGBA':
             face_img = face_img.convert('RGBA')
         
@@ -533,19 +605,15 @@ async def generate_versus_image(session, doc):
         alpha = alpha.point(lambda p: int(p * 0.6)) 
         face_img.putalpha(alpha)
 
-        # Center on Victim Panel
         center_x = victim_x + (ANATOMY_W // 2)
         center_y = anatomy_y + (ANATOMY_H // 2)
         
-        # Increase to go higher, decrease to go lower.
         offset_up = 55
         paste_y = (center_y - (target_height // 2)) - offset_up
         paste_x = center_x - (target_width // 2)
         canvas.paste(face_img, (paste_x, paste_y), face_img)
 
-    # 4. Stats (Participants & Silver)
-    
-    # Killer Side: Participants & Fame 
+    # 7. Stats & Silver
     stats_y = anatomy_y + 345
     stats_x = killer_x - 20
     
@@ -555,30 +623,26 @@ async def generate_versus_image(session, doc):
     draw.text((stats_x, stats_y), f"Participants: {part_count}", fill="#252525", font=SMALL_FONT)
     draw.text((stats_x, stats_y + 22), f"Total Fame: {fame:,}", fill="#252525", font=SMALL_FONT)
 
-    # Victim Side: Silver
+    # Silver Section
     loss_y = anatomy_y + 345
     loss_x = victim_x + 310
-    
     est_val = doc.get('EstimatedVictimLootValue', 0)
     
-    # Silver Icon
-    silver_img = next((img for (t, _, s, _), img in zip(tasks, results) if s == 'silver'), None)
-    if silver_img:
-        silver_img = silver_img.resize((45, 45))
-        canvas.paste(silver_img, (loss_x - 45, loss_y - 10), silver_img)
+    if silver_image:
+        silver_image = silver_image.resize((45, 45))
+        canvas.paste(silver_image, (loss_x - 45, loss_y - 10), silver_image)
     
     draw.text((loss_x, loss_y), f"{est_val:,}", fill="#333333", font=SMALL_FONT)
 
-    # --- SEPARATOR LINE ---
+    # Separator
     line_y = anatomy_y + ANATOMY_H + 20
     draw.line([(padding_x, line_y), (total_width - padding_x, line_y)], fill="#554433", width=3)
 
-    # --- INVENTORY SECTION ---
+    # 8. Inventory Section
     if inventory_items:
         inv_start_y = line_y + 30
         grid_width = (inv_cols * inv_icon_size) + ((inv_cols - 1) * inv_gap)
-        start_x = (total_width - grid_width) // 2
-        
+        start_x = (total_width - grid_width) // 2      
         inv_results = [(t, img) for t, img in zip(tasks, results) if t[0] == 'inv']
         box_img = Image.new('RGBA', (inv_icon_size, inv_icon_size), (0, 0, 0, 60)) 
         
@@ -606,6 +670,7 @@ async def generate_versus_image(session, doc):
     buffer.seek(0)
     return buffer
 
+#OUTSIDEEE
 def create_embed(doc, est_value):
     k = doc['Killer']
     v = doc['Victim']
