@@ -21,7 +21,7 @@ limiter = Limiter(
 )
 
 
-mongoURI = os.getenv('MONGODB_URI')
+mongoURI = os.getenv('TEST_URI')
 client = MongoClient(mongoURI)
 db = client.flask_database
 
@@ -38,8 +38,6 @@ battles_collection.create_index([("endTime", DESCENDING)])
 cache_collection.create_index([("last_updated", ASCENDING)], expireAfterSeconds=300)
 battles_cache.create_index([("createdAt", ASCENDING)], expireAfterSeconds=3600)
 
-
-# This creates a specialized index for searching words inside these arrays
 battles_collection.create_index([
     ("player_names", TEXT),
     ("guild_names", TEXT)
@@ -51,7 +49,7 @@ def get_scheduler_status(key='scheduler_status'):
         return {'last_check': 'Waiting...', 'next_run': time.time()}
     return status
 
-# --- EVENTS LOGIC (Helpers for Fallback) ---
+# --- EVENTS LOGIC ---
 def fetch_event_details(event_id):
     try:
         response = requests.get(f'https://gameinfo-sgp.albiononline.com/api/gameinfo/events/{event_id}', timeout=10)
@@ -62,102 +60,135 @@ def fetch_event_details(event_id):
 
 
 # --- BATTLES LOGIC ---
-def fetch_battles_data(sort_type='recent', time_range='week', limit=51, offset=0):
+def fetch_battles_data(sort_type='recent', time_range='week', limit=51, offset=0, max_fetch=1500):
     try:
         base_url = "https://gameinfo-sgp.albiononline.com/api/gameinfo/battles"       
-        # Changed to list of tuples to enforce exact order: range -> offset -> limit -> sort
-        params = [
-            ('range', time_range),
-            ('offset', offset),
-            ('limit', limit),
-            ('sort', sort_type)
-        ]
-        
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.159 Safari/537.36'
         }
 
-        response = requests.get(base_url, params=params, headers=headers, timeout=15)
-        
-        if response.status_code == 200:
-            battles = response.json()
-            count = 0
-            for b in battles:
-                if b.get('totalFame', 0) <= 100000:
-                    continue
-                try:
+        current_offset = offset
+        total_fetched = 0
+
+        print(f"Starting battle fetch: range={time_range}, sort={sort_type}, limit={limit}, max_fetch={max_fetch}")
+
+        while total_fetched < max_fetch:
+            params = [
+                ('range', time_range),
+                ('offset', current_offset),
+                ('limit', limit),
+                ('sort', sort_type)
+            ]
+            
+            try:
+                response = requests.get(base_url, params=params, headers=headers, timeout=15)
+                
+                if response.status_code != 200:
+                    print(f"API Error {response.status_code} at offset {current_offset}. Stopping.")
+                    break
+
+                battles = response.json()
+                
+                if not battles:
+                    print(f"No battles returned at offset {current_offset}. Stopping.")
+                    break
+
+                count = 0
+                for b in battles:
+                    if b.get('totalFame', 0) <= 100000:
+                        continue
                     try:
-                        end_time = datetime.fromisoformat(b['endTime'].replace('Z', '+00:00'))
+                        t_str = b['endTime'].replace('Z', '')
+                        if '.' in t_str:
+                            main_part, frac_part = t_str.split('.')
+                            t_str = f"{main_part}.{frac_part[:6]}"
+                        end_time = datetime.fromisoformat(t_str).replace(tzinfo=timezone.utc)
                     except (ValueError, TypeError):
-                        end_time = datetime.now()
+                        end_time = datetime.now(timezone.utc)
                     
-                    guild_player_counts = {}
-                    players_dict = b.get('players', {})
-                    total_players = len(players_dict)
-                    searchable_player_names = []
-                    
-                    for p_id, p_data in players_dict.items():
-                        g_id = p_data.get('guildId')
-                        if g_id:
-                            guild_player_counts[g_id] = guild_player_counts.get(g_id, 0) + 1
-                    
-                        if p_data.get('name'):
-                            searchable_player_names.append(p_data['name'])
-                            
-                    processed_guilds = {}
-                    searchable_guild_names = []
-                    
-                    if 'guilds' in b:
-                        for gid, gdata in b['guilds'].items():
-                            g_name = gdata.get('name')
-                            if g_name:
-                                searchable_guild_names.append(g_name)
+                    try:
+                        guild_player_counts = {}
+                        players_dict = b.get('players', {})
+                        total_players = len(players_dict)
+                        searchable_player_names = []
+                        
+                        for p_id, p_data in players_dict.items():
+                            g_id = p_data.get('guildId')
+                            if g_id:
+                                guild_player_counts[g_id] = guild_player_counts.get(g_id, 0) + 1
+                        
+                            if p_data.get('name'):
+                                searchable_player_names.append(p_data['name'])
                                 
-                            processed_guilds[gid] = {
-                                'name': g_name,
-                                'kills': gdata.get('kills', 0),
-                                'deaths': gdata.get('deaths', 0),
-                                'killFame': gdata.get('killFame', 0),
-                                'alliance': gdata.get('alliance'),
-                                'allianceId': gdata.get('allianceId'),
-                                'id': gdata.get('id'),
-                                'playerCount': guild_player_counts.get(gid, 0)
-                            }
+                        processed_guilds = {}
+                        searchable_guild_names = []
+                        
+                        if 'guilds' in b:
+                            for gid, gdata in b['guilds'].items():
+                                g_name = gdata.get('name')
+                                if g_name:
+                                    searchable_guild_names.append(g_name)
+                                    
+                                processed_guilds[gid] = {
+                                    'name': g_name,
+                                    'kills': gdata.get('kills', 0),
+                                    'deaths': gdata.get('deaths', 0),
+                                    'killFame': gdata.get('killFame', 0),
+                                    'alliance': gdata.get('alliance'),
+                                    'allianceId': gdata.get('allianceId'),
+                                    'id': gdata.get('id'),
+                                    'playerCount': guild_player_counts.get(gid, 0)
+                                }
 
-                    processed_alliances = {}
-                    if 'alliances' in b:
-                        for aid, adata in b['alliances'].items():
-                            processed_alliances[aid] = {
-                                'name': adata.get('name'),
-                                'kills': adata.get('kills', 0),
-                                'deaths': adata.get('deaths', 0),
-                                'killFame': adata.get('killFame', 0),
-                                'id': adata.get('id')
-                            }
+                        processed_alliances = {}
+                        if 'alliances' in b:
+                            for aid, adata in b['alliances'].items():
+                                processed_alliances[aid] = {
+                                    'name': adata.get('name'),
+                                    'kills': adata.get('kills', 0),
+                                    'deaths': adata.get('deaths', 0),
+                                    'killFame': adata.get('killFame', 0),
+                                    'id': adata.get('id')
+                                }
 
-                    battle_doc = {
-                        'id': b['id'],
-                        'totalFame': b.get('totalFame', 0),
-                        'totalKills': b.get('totalKills', 0),
-                        'endTime': end_time,
-                        'totalPlayers': total_players,
-                        'guilds': processed_guilds,
-                        'alliances': processed_alliances,
-                        'player_names': searchable_player_names, 
-                        'guild_names': searchable_guild_names
-                    }
+                        battle_doc = {
+                            'id': b['id'],
+                            'totalFame': b.get('totalFame', 0),
+                            'totalKills': b.get('totalKills', 0),
+                            'endTime': end_time,
+                            'totalPlayers': total_players,
+                            'guilds': processed_guilds,
+                            'alliances': processed_alliances,
+                            'player_names': searchable_player_names, 
+                            'guild_names': searchable_guild_names
+                        }
 
-                    battles_collection.update_one(
-                        {'id': b['id']},
-                        {'$set': battle_doc},
-                        upsert=True
-                    )
-                    count += 1
-                except Exception as e:
-                    print(f"Error processing battle {b.get('id')}: {e}")
-            print(f"Processed {count} battles (Sort: {sort_type}, Range: {time_range}).")
+                        battles_collection.update_one(
+                            {'id': b['id']},
+                            {'$set': battle_doc},
+                            upsert=True
+                        )
+                        count += 1
+                    except Exception as e:
+                        print(f"Error processing battle {b.get('id')}: {e}")
+                
+                print(f"Processed {count} valid battles at offset {current_offset} (Fetched {len(battles)} items).")
+                
+                total_fetched += len(battles)
+                current_offset += limit
+                
+                if len(battles) < limit:
+                    print("Reached end of battle history.")
+                    break
+                    
+                time.sleep(1.5)
+
+            except requests.exceptions.RequestException as e:
+                print(f"Network error at offset {current_offset}: {e}")
+                break
+
     except Exception as e:
-        print(f"Error fetching battles: {e}")
+        print(f"Critical error fetching battles: {e}")
 
 def fetch_full_battle_history(battle_id):
     all_events = []
@@ -298,14 +329,15 @@ def get_battle_details_cached(battle_id):
 def scheduled_update_battles():
     with app.app_context():
         print("Scheduler: Battles running...")
-        fetch_battles_data(sort_type='recent', time_range='week', limit=51)        
         current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        next_run = time.time() + 90
+        next_run = time.time() + 90 
+        
         settings_collection.update_one(
             {'_id': 'battle_scheduler_status'},
             {'$set': {'last_check': current_time, 'next_run': next_run}},
             upsert=True
         )
+        fetch_battles_data(sort_type='recent', time_range='week', limit=51)
 
 # --- HELPERS ---
 def fetch_player_from_api(player_id):
