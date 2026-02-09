@@ -1,5 +1,6 @@
 # killboard
-https://lalo-kb.onrender.com/
+**https://ao-kb.fly.dev/**
+
 
 ![](images/one.png)
 ![](images/one_one.png)
