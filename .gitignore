@@ -9,3 +9,8 @@ assets/killer.png
 assets/killer_mogs.png
 assets/mogged.png
 assets/moggedlul.png
+.vscode/*
+DESIGN.md
+sample.txt
+fix_darkmode_colors.py
+*.txt

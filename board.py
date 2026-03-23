@@ -20,7 +20,6 @@ limiter = Limiter(
     storage_uri="memory://"
 )
 
-
 mongoURI = os.getenv('TEST_URI')
 client = MongoClient(mongoURI)
 db = client.flask_database
@@ -57,7 +56,6 @@ def fetch_event_details(event_id):
             return response.json()
     except Exception: pass
     return None
-
 
 # --- BATTLES LOGIC ---
 def fetch_battles_data(sort_type='recent', time_range='week', limit=51, offset=0, max_fetch=1500):
@@ -237,11 +235,53 @@ def fetch_full_battle_history(battle_id):
 
 # --- BATTLE DETAILS CACHE LOGIC ---
 
+def minify_battle_event(event):
+    def clean_item(item):
+        if not item: return None
+        return {
+            'Type': item.get('Type'),
+            'Count': item.get('Count', 1),
+            'Quality': item.get('Quality', 1)
+        }
+
+    def clean_equipment(equip):
+        if not equip: return None
+        cleaned = {}
+        for slot, item in equip.items():
+            if item:
+                cleaned[slot] = clean_item(item)
+            else:
+                cleaned[slot] = None
+        return cleaned
+
+    def clean_inventory(inv):
+        if not inv: return []
+        return [clean_item(i) for i in inv if i]
+
+    k = event.get('Killer', {})
+    v = event.get('Victim', {})
+
+    return {
+        'TotalVictimKillFame': event.get('TotalVictimKillFame', 0),
+        'Killer': {
+            'Name': k.get('Name', 'Unknown'),
+            'GuildName': k.get('GuildName', ''),
+            'AllianceName': k.get('AllianceName', ''),
+            'Equipment': clean_equipment(k.get('Equipment'))
+        },
+        'Victim': {
+            'Name': v.get('Name', 'Unknown'),
+            'GuildName': v.get('GuildName', ''),
+            'AllianceName': v.get('AllianceName', ''),
+            'Equipment': clean_equipment(v.get('Equipment')),
+            'Inventory': clean_inventory(v.get('Inventory'))
+        }
+    }
+
 def get_battle_details_cached(battle_id):
     cached = battles_cache.find_one({'battle_id': battle_id})
     if cached:
         return cached['players']
-    
     players_map = {}
     try:
         summary_url = f"https://gameinfo-sgp.albiononline.com/api/gameinfo/battles/{battle_id}"
@@ -268,7 +308,6 @@ def get_battle_details_cached(battle_id):
         print(f"Error fetching battle summary for player list: {e}")
 
     events = fetch_full_battle_history(battle_id)
-    
     def init_player_if_missing(p_id, name, guild, alliance, ip=0):
         p_id = str(p_id)
         if p_id not in players_map:
@@ -289,38 +328,41 @@ def get_battle_details_cached(battle_id):
             if int(ip) > players_map[p_id]['IP']:
                 players_map[p_id]['IP'] = int(ip)
 
+    # 3. Process Events
     for e in events:
         k = e['Killer']
         v = e['Victim']
         parts = e.get('Participants', [])
-        
+        mini_event = minify_battle_event(e)
+
         # Process Killer
         init_player_if_missing(k['Id'], k['Name'], k.get('GuildName'), k.get('AllianceName'), k.get('AverageItemPower', 0))
-        players_map[str(k['Id'])]['Kills'].append(e)
+        players_map[str(k['Id'])]['Kills'].append(mini_event)
         if players_map[str(k['Id'])]['KillFame'] == 0:
              players_map[str(k['Id'])]['KillFame'] += e.get('TotalVictimKillFame', 0)
         
         # Process Victim
         init_player_if_missing(v['Id'], v['Name'], v.get('GuildName'), v.get('AllianceName'), v.get('AverageItemPower', 0))
-        players_map[str(v['Id'])]['DeathEvents'].append(e)
+        players_map[str(v['Id'])]['DeathEvents'].append(mini_event)
         if players_map[str(v['Id'])]['Deaths'] == 0:
             players_map[str(v['Id'])]['Deaths'] += 1
         players_map[str(v['Id'])]['Deaths'] = max(players_map[str(v['Id'])]['Deaths'], len(players_map[str(v['Id'])]['DeathEvents']))
 
-        # Process Participants (Damage/Healing)
         for p in parts:
             init_player_if_missing(p['Id'], p['Name'], p.get('GuildName'), p.get('AllianceName'), p.get('AverageItemPower', 0))
             players_map[str(p['Id'])]['Damage'] += int(p.get('DamageDone', 0))
             players_map[str(p['Id'])]['Healing'] += int(p.get('SupportHealingDone', 0))
 
     players_list = list(players_map.values())
-    
     if players_list:
-        battles_cache.update_one(
-            {'battle_id': battle_id},
-            {'$set': {'battle_id': battle_id, 'createdAt': datetime.now(timezone.utc), 'players': players_list}},
-            upsert=True
-        )
+        try:
+            battles_cache.update_one(
+                {'battle_id': battle_id},
+                {'$set': {'battle_id': battle_id, 'createdAt': datetime.now(timezone.utc), 'players': players_list}},
+                upsert=True
+            )
+        except Exception as e:
+            print(f"Error caching battle {battle_id}: {e}")
     
     return players_list
 
@@ -431,6 +473,8 @@ def calculate_estimated_loss(victim_data):
 @app.route("/battles")
 def battles():
     page = request.args.get('page', 1, type=int)
+    if page > 200: 
+        page = 200
     search_query = request.args.get('search', '').strip()
     per_page = 25
     skip_amount = (page - 1) * per_page
@@ -494,24 +538,20 @@ def events(event_id):
 @app.route('/api/battles_list')
 @limiter.limit("60 per minute")
 def api_battles_list():
-    # --- 1. Security: Validate Pagination ---
     try:
         page = int(request.args.get('page', 1))
     except ValueError:
         page = 1
     
     if page < 1: page = 1
-    if page > 200:
-        return jsonify({'error': 'Page limit exceeded. Please refine your search.'}), 400
+    if page > 200: return jsonify({'error': 'Page limit exceeded. Please refine your search.'}), 400
 
-    # --- 2. Security: Sanitize Search Input ---
-    search_query = request.args.get('search', '').strip()
+    search_query = request.args.get('search', '').strip().replace('"', '')
     
     if search_query and not search_query.isdigit() and len(search_query) < 3:
         return jsonify({'error': 'Search query must be at least 3 characters.'}), 400
 
     per_page = 25
-    skip_amount = (page - 1) * per_page 
     base_query = {'totalFame': {'$gt': 100000}}
 
     if search_query:
@@ -526,13 +566,11 @@ def api_battles_list():
     else:
         mongo_query = base_query
 
-    # --- 4. Execution ---
     total_battles = battles_collection.count_documents(mongo_query)
-    total_pages = math.ceil(total_battles / per_page)
-    
-    # Sort by endTime descending
+    total_pages = max(1, math.ceil(total_battles / per_page))
+    if page > total_pages: page = total_pages
+    skip_amount = (page - 1) * per_page
     battles_cursor = battles_collection.find(mongo_query).sort("endTime", -1).skip(skip_amount).limit(per_page)
-    
     battles_data = []
     
     for b in battles_cursor:

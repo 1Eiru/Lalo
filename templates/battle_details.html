@@ -1,310 +1,355 @@
-{% extends "base.html" %}
-{% block head %}
-<style>
-    .table td {
-        font-size: 1.05rem !important; 
-        font-weight: 500 !important;  
-        vertical-align: middle;
-    }
-    .table th {
-        font-size: 1.05rem !important;
-        font-weight: 700 !important; 
-    }
-    .table a {
-        font-weight: 600 !important;
-        text-decoration: none;
-    }
-    .badge {
-        font-size: 0.9em !important; 
-        font-weight: 600 !important;
-    }
-
-    @media (max-width: 768px) {
-        .table-mobile-compact td, 
-        .table-mobile-compact th {
-            padding: 0.25rem 0.5rem; 
-            font-size: 0.85rem !important; 
-            white-space: nowrap;     
+<!DOCTYPE html>
+<html class="light" lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>Battle #{{ battle.id }} - AO KillBoard</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "surface": "#f6faff",
+                        "surface-container-highest": "#dbe4ed",
+                        "inverse-surface": "#293138",
+                        "on-tertiary": "#ffffff",
+                        "on-primary-container": "#ffffff",
+                        "tertiary": "#b91830",
+                        "primary-fixed-dim": "#b1c5ff",
+                        "surface-container-high": "#e0e9f2",
+                        "surface-container": "#e6eff8",
+                        "on-error-container": "#93000a",
+                        "on-secondary-fixed": "#181c20",
+                        "on-background": "#141d23",
+                        "outline": "#727787",
+                        "on-tertiary-fixed": "#410008",
+                        "primary": "#0057cd",
+                        "secondary": "#5b5f63",
+                        "outline-variant": "#c2c6d8",
+                        "on-primary": "#ffffff",
+                        "on-secondary": "#ffffff",
+                        "surface-container-lowest": "#ffffff",
+                        "tertiary-fixed-dim": "#ffb3b2",
+                        "secondary-fixed-dim": "#c3c7cc",
+                        "on-surface": "#141d23",
+                        "secondary-container": "#dde0e5",
+                        "inverse-on-surface": "#e9f2fb",
+                        "tertiary-container": "#dd3645",
+                        "on-error": "#ffffff",
+                        "error-container": "#ffdad6",
+                        "on-primary-fixed": "#001946",
+                        "primary-fixed": "#dae2ff",
+                        "inverse-primary": "#b1c5ff",
+                        "surface-variant": "#dbe4ed",
+                        "surface-bright": "#f6faff",
+                        "error": "#ba1a1a",
+                        "on-secondary-fixed-variant": "#43474c",
+                        "secondary-fixed": "#e0e3e8",
+                        "on-secondary-container": "#5f6368",
+                        "surface-dim": "#d2dbe4",
+                        "on-tertiary-fixed-variant": "#92001f",
+                        "tertiary-fixed": "#ffdad9",
+                        "background": "#f6faff",
+                        "surface-tint": "#0057ce",
+                        "on-primary-fixed-variant": "#00419e",
+                        "surface-container-low": "#ecf5fe",
+                        "primary-container": "#0d6efd",
+                        "on-surface-variant": "#424655",
+                        "on-tertiary-container": "#130001"
+                    },
+                    fontFamily: {
+                        "headline": ["Inter"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    },
+                    borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+                },
+            },
         }
-    }
-
-    .sort-link {
-        color: inherit;
-        text-decoration: none;
-        display: block;
-        width: 100%;
-        cursor: pointer;
-        white-space: nowrap;
-    }
-    .sort-link:hover {
-        color: #0d6efd;
-        background-color: rgba(0,0,0,0.02);
-    }
-
-    .kill-count-btn, .death-count-btn {
-        cursor: pointer;
-        text-decoration: underline;
-        transition: opacity 0.2s;
-    }
-    .kill-count-btn:hover, .death-count-btn:hover {
-        opacity: 0.8;
-        color: white;
-    }
-
-    .mini-grid-item {
-        height: 60px;
-        width: 60px;
-        background-color: rgba(0,0,0,0.05);
-        border-radius: 4px;
-        position: relative;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        margin: 2px;
-    }
-    .mini-item-count {
-        position: absolute;
-        bottom: 0;
-        right: 0;
-        background: rgba(0,0,0,0.7);
-        color: white;
-        font-size: 10px;
-        padding: 0 3px;
-        border-radius: 2px;
-    }
-    .mini-grid-item img {
-        max-width: 100%;
-        max-height: 100%;
-    }
-
-    .gear-container {
-        width: 200px; 
-        margin: 0 auto;
-    }
-
-    @media (max-width: 576px) {
-        .modal-body {
-            padding-left: 0.5rem;
-            padding-right: 0.5rem;
+    </script>
+    <!-- Restore dark mode before paint to avoid flash -->
+    <script>
+        if (localStorage.getItem('ao-dark-mode') === 'true') {
+            document.documentElement.classList.remove('light');
+            document.documentElement.classList.add('dark');
         }
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f6faff; }
+        .dark body { background-color: #0d1117; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-header {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(12px);
+        }
+        .dark .glass-header {
+            background: rgba(20, 29, 35, 0.7);
+        }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+
+        .sort-link {
+            color: inherit;
+            text-decoration: none;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        .sort-link:hover { color: #0057cd; }
+
+        .kill-count-btn, .death-count-btn {
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        .kill-count-btn:hover, .death-count-btn:hover { opacity: 0.8; }
+
         .mini-grid-item {
-            height: 45px;
-            width: 45px;
+            height: 60px;
+            width: 60px;
+            border-radius: 8px;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 2px;
         }
-        .gear-container {
-            width: 155px; 
+        .mini-item-count {
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            font-size: 10px;
+            padding: 0 3px;
+            border-radius: 2px;
         }
-        .modal-title {
-            font-size: 1rem;
-        }
-    }
-</style>
-{% endblock %}
+        .mini-grid-item img { max-width: 100%; max-height: 100%; }
+        .gear-container { width: 200px; margin: 0 auto; }
 
-{% block content %}
+        @media (max-width: 576px) {
+            .mini-grid-item { height: 45px; width: 45px; }
+            .gear-container { width: 155px; }
+        }
 
-<div class="container-fluid mt-4 px-4">
-    <!-- Battle Header Info -->
-    <div class="card shadow mb-4">
-        <div class="card-body text-center">
-            <h2 class="card-title d-flex justify-content-center align-items-center gap-2">
-                <img src="{{ url_for('static', filename='/FeelsDankMan.png') }}" 
-                     alt="icon" 
-                     style="height: 1.2em; width: auto;"
-                     onerror="this.style.display='none'">
-                Battle #{{ battle.id }}
-            </h2>
-            
-            <h5 class="text-muted">
-                {% if battle.endTime is string %}
+        /* Modal overlay */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 100;
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(4px);
+            justify-content: center;
+            align-items: flex-start;
+            padding-top: 5vh;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal-box {
+            background: white;
+            border-radius: 1rem;
+            max-width: 700px;
+            width: 95%;
+            max-height: 85vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+        }
+        .dark .modal-box {
+            background: #161b22;
+            color: #e9f2fb;
+        }
+    </style>
+</head>
+<body class="bg-surface dark:bg-[#0d1117] text-on-surface dark:text-gray-200 min-h-screen transition-colors duration-300">
+
+<!-- Top Navigation Bar -->
+<nav class="w-full sticky top-0 z-50 bg-[#ffffff]/70 dark:bg-[#0d1117]/80 backdrop-blur-md font-['Inter'] antialiased text-sm tracking-tight transition-all duration-200 ease-in-out border-b border-outline-variant/10 dark:border-gray-800">
+    <div class="flex justify-between items-center h-16 px-8 max-w-5xl mx-auto">
+        <a href="/" class="text-xl font-bold tracking-tighter text-[#141d23] dark:text-white hover:opacity-80 transition-opacity">AO KillBoard</a>
+        <button id="themeToggle" class="p-2 rounded-xl bg-surface-container dark:bg-gray-800 text-on-surface-variant dark:text-gray-400 hover:bg-surface-container-high dark:hover:bg-gray-700 transition-colors flex items-center justify-center">
+            <span class="material-symbols-outlined dark:hidden" data-icon="dark_mode">dark_mode</span>
+            <span class="material-symbols-outlined hidden dark:block" data-icon="light_mode">light_mode</span>
+        </button>
+    </div>
+</nav>
+
+<main class="max-w-5xl mx-auto px-4 md:px-8 py-12 space-y-12">
+    <!-- Hero Header Section -->
+    <header class="space-y-4">
+        <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
+            <div>
+                <h1 class="text-4xl font-extrabold tracking-tighter text-on-surface dark:text-gray-200 flex items-center gap-3">
+                    <img src="{{ url_for('static', filename='FeelsDankMan.png') }}"
+                         alt="icon" class="h-10 w-auto"
+                         onerror="this.style.display='none'">
+                    Battle #{{ battle.id }}
+                </h1>
+                <p class="text-on-surface-variant/60 dark:text-gray-500 font-medium tracking-wide mt-1">
+                    {% if battle.endTime is string %}
                     {{ battle.endTime.replace('T', ' ').split('.')[0] }}
-                {% else %}
+                    {% else %}
                     {{ battle.endTime.strftime('%Y-%m-%d %H:%M:%S') }}
-                {% endif %}
-            </h5>
-
-            <div class="row mt-3 justify-content-center">
-                <div class="col-md-3">
-                    <div class="p-2 border rounded bg-light">
-                        <strong>Total Fame 👍</strong><br>
-                        {{ "{:,}".format(battle.totalFame) }}
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="p-2 border rounded bg-light">
-                        <strong>Total Kills ⚔️</strong><br>
-                        {{ "{:,}".format(battle.totalKills if battle.totalKills else 0) }}
-                    </div>
-                </div>
+                    {% endif %}
+                </p>
             </div>
         </div>
-    </div>
+        <!-- Key Stats Bento Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
+            <div class="bg-surface-container-lowest dark:bg-[#161b22] p-8 rounded-xl flex flex-col justify-center items-start border border-outline-variant/10 dark:border-gray-800 dark:border-gray-700 dark:border-gray-700 shadow-sm">
+                <span class="text-label-md uppercase tracking-[0.1em] text-on-surface-variant/60 dark:text-gray-500 font-bold text-xs mb-2">Total Fame</span>
+                <span class="text-4xl font-black text-primary dark:text-primary-fixed-dim tracking-tighter">{{ "{:,}".format(battle.totalFame) }}</span>
+            </div>
+            <div class="bg-surface-container-lowest dark:bg-[#161b22] p-8 rounded-xl flex flex-col justify-center items-start border border-outline-variant/10 dark:border-gray-800 dark:border-gray-700 dark:border-gray-700 shadow-sm">
+                <span class="text-label-md uppercase tracking-[0.1em] text-on-surface-variant/60 dark:text-gray-500 font-bold text-xs mb-2">Total Kills</span>
+                <span class="text-4xl font-black text-tertiary dark:text-tertiary-fixed-dim tracking-tighter">{{ "{:,}".format(battle.totalKills if battle.totalKills else 0) }}</span>
+            </div>
+        </div>
+    </header>
 
-    <!-- SPLIT VIEW: ALLIANCES AND GUILDS -->
-    <div class="row">
-        
-        <!-- LEFT COLUMN: ALLIANCE STATISTICS -->
-        <div class="col-xl-6 mb-4">
-            <div class="card shadow h-100">
-                <div class="card-header text-dark d-flex justify-content-between align-items-center" style="background-color: #e9ecef;">
-                    <h5 class="mb-0">Alliances</h5>
-                </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-hover table-mobile-compact mb-0">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>Alliance</th>
-                                    <th class="text-center">Players</th>
-                                    <th class="text-center">Kills</th>
-                                    <th class="text-center">Deaths</th>
-                                    <th class="text-end">Total Fame</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for ally in alliances %}
-                                <tr>
-                                    <td>
-                                        {% if ally.name %}
-                                            <span class="badge bg-secondary">{{ ally.name }}</span>
-                                        {% else %}
-                                            <span class="text-muted">No Alliance</span>
-                                        {% endif %}
-                                    </td>
-                                    <td class="text-center">
-                                        <span class="text-dark">{{ ally.playerCount if ally.playerCount else 0 }}</span>
-                                    </td>
-                                    <td class="text-center">{{ ally.kills }}</td>
-                                    <td class="text-center">{{ ally.deaths }}</td>
-                                    <td class="text-end fw-bold">{{ "{:,}".format(ally.killFame) }}</td>
-                                </tr>
-                                {% else %}
-                                <tr>
-                                    <td colspan="5" class="text-center">No alliance data available.</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+    <!-- Table Section: Alliances -->
+    <section class="space-y-6">
+        <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-primary dark:text-primary-fixed-dim" data-icon="group_work">group_work</span>
+            <h2 class="text-xl font-bold tracking-tight">Alliances</h2>
+        </div>
+        <div class="overflow-x-auto no-scrollbar bg-surface-container-lowest dark:bg-[#161b22] rounded-xl">
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="bg-surface-container-high/50 dark:bg-gray-800 text-on-surface-variant dark:text-gray-400">
+                        <th class="px-6 py-4 text-xs font-bold uppercase tracking-widest">Alliance</th>
+                        <th class="px-6 py-4 text-xs font-bold uppercase tracking-widest text-right">Players</th>
+                        <th class="px-6 py-4 text-xs font-bold uppercase tracking-widest text-right">Kills</th>
+                        <th class="px-6 py-4 text-xs font-bold uppercase tracking-widest text-right">Deaths</th>
+                        <th class="px-6 py-4 text-xs font-bold uppercase tracking-widest text-right">Total Fame</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-surface-variant/20 dark:divide-gray-800">
+                    {% for ally in alliances %}
+                    <tr class="hover:bg-surface-container-low dark:hover:bg-surface-container-low/10 transition-colors group">
+                        <td class="px-6 py-6 font-bold text-primary dark:text-primary-fixed-dim">
+                            {% if ally.name %}{{ ally.name }}{% else %}<span class="text-on-surface-variant/50 dark:text-gray-500 italic">No Alliance</span>{% endif %}
+                        </td>
+                        <td class="px-6 py-6 text-right font-medium">{{ ally.playerCount if ally.playerCount else 0 }}</td>
+                        <td class="px-6 py-6 text-right font-medium text-tertiary dark:text-tertiary-fixed-dim">{{ ally.kills }}</td>
+                        <td class="px-6 py-6 text-right font-medium">{{ ally.deaths }}</td>
+                        <td class="px-6 py-6 text-right font-bold text-on-surface dark:text-gray-200">{{ "{:,}".format(ally.killFame) }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="5" class="px-6 py-8 text-center text-on-surface-variant/50 dark:text-gray-500 text-sm">No alliance data available.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <!-- Table Section: Guilds -->
+    <section class="space-y-6">
+        <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-primary dark:text-primary-fixed-dim" data-icon="shield">shield</span>
+            <h2 class="text-xl font-bold tracking-tight">Guilds</h2>
+        </div>
+        <div class="overflow-x-auto no-scrollbar bg-surface-container-lowest dark:bg-[#161b22] rounded-xl shadow-sm border border-outline-variant/5 dark:border-gray-800">
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="bg-surface-container-high/50 dark:bg-gray-800 text-on-surface-variant dark:text-gray-400">
+                        <th class="px-6 py-4 text-xs font-bold uppercase tracking-widest">Guild</th>
+                        <th class="px-6 py-4 text-xs font-bold uppercase tracking-widest text-right"><a href="#" onclick="sortGuilds('playerCount'); return false;" class="sort-link">Players <span id="gSortIcon-playerCount"></span></a></th>
+                        <th class="px-6 py-4 text-xs font-bold uppercase tracking-widest text-right"><a href="#" onclick="sortGuilds('kills'); return false;" class="sort-link">Kills <span id="gSortIcon-kills"></span></a></th>
+                        <th class="px-6 py-4 text-xs font-bold uppercase tracking-widest text-right"><a href="#" onclick="sortGuilds('deaths'); return false;" class="sort-link">Deaths <span id="gSortIcon-deaths"></span></a></th>
+                        <th class="px-6 py-4 text-xs font-bold uppercase tracking-widest text-right"><a href="#" onclick="sortGuilds('killFame'); return false;" class="sort-link">Kill Fame <span id="gSortIcon-killFame">▼</span></a></th>
+                    </tr>
+                </thead>
+                <tbody id="guildsTableBody" class="divide-y divide-surface-variant/10 dark:divide-gray-800">
+                </tbody>
+            </table>
+        </div>
+        <div class="flex justify-center gap-2" id="guildsPagination"></div>
+    </section>
+
+    <!-- Table Section: Players -->
+    <section class="space-y-6">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <span class="material-symbols-outlined text-primary dark:text-primary-fixed-dim" data-icon="person">person</span>
+                <h2 class="text-xl font-bold tracking-tight">Players (<span id="playerCountDisplay">{{ total_players_count }}</span>)</h2>
             </div>
         </div>
 
-        <!-- RIGHT COLUMN: GUILD STATISTICS -->
-        <div class="col-xl-6 mb-4">
-            <div class="card shadow h-100">
-                <div class="card-header text-dark d-flex justify-content-between align-items-center" style="background-color: #e9ecef;">
-                    <h5 class="mb-0">Guilds</h5>
-                </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-hover table-mobile-compact mb-0">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>Guild</th>
-                                    <th class="text-center"><a href="#" onclick="sortGuilds('playerCount'); return false;" class="sort-link">Players <span id="gSortIcon-playerCount"></span></a></th>
-                                    <th class="text-center"><a href="#" onclick="sortGuilds('kills'); return false;" class="sort-link">Kills <span id="gSortIcon-kills"></span></a></th>
-                                    <th class="text-center"><a href="#" onclick="sortGuilds('deaths'); return false;" class="sort-link">Deaths <span id="gSortIcon-deaths"></span></a></th>
-                                    <th class="text-end"><a href="#" onclick="sortGuilds('killFame'); return false;" class="sort-link text-end pe-2">Kill Fame <span id="gSortIcon-killFame">▼</span></a></th>
-                                </tr>
-                            </thead>
-                            <tbody id="guildsTableBody">
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-                <div class="card-footer bg-white">
-                    <nav aria-label="Guild navigation">
-                        <ul class="pagination justify-content-center mb-0 pagination-sm" id="guildsPagination">
-                        </ul>
-                    </nav>
-                </div>
+        <!-- Filters Row -->
+        <div class="flex flex-col md:flex-row gap-3">
+            <select id="guildFilter" class="flex-1 px-4 py-2.5 bg-surface-container-lowest dark:bg-[#161b22] border border-outline-variant/20 dark:border-gray-700 dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none">
+                <option value="">All Guilds</option>
+                {% for g in unique_guilds %}
+                    {% if g %}
+                    <option value="{{ g }}">{{ g }}</option>
+                    {% endif %}
+                {% endfor %}
+            </select>
+            <select id="allianceFilter" class="flex-1 px-4 py-2.5 bg-surface-container-lowest dark:bg-[#161b22] border border-outline-variant/20 dark:border-gray-700 dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none">
+                <option value="">All Alliances</option>
+                {% for a in unique_alliances %}
+                    {% if a %}
+                    <option value="{{ a }}">{{ a }}</option>
+                    {% endif %}
+                {% endfor %}
+            </select>
+            <div class="flex-1 relative">
+                <span class="absolute inset-y-0 left-4 flex items-center text-on-surface-variant/40 dark:text-gray-200/40">
+                    <span class="material-symbols-outlined text-sm" data-icon="search">search</span>
+                </span>
+                <input type="text" id="playerFilter" class="w-full pl-10 pr-4 py-2.5 bg-surface-container-lowest dark:bg-[#161b22] border border-outline-variant/20 dark:border-gray-700 dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none" placeholder="Search Player Name...">
             </div>
         </div>
-    </div>
 
-    <!-- PLAYER STATISTICS SECTION -->
-    <div class="card shadow mb-4">
-        <div class="card-header text-dark" style="background-color: #e9ecef;">
-            <h5 class="mb-0">Players (<span id="playerCountDisplay">{{ total_players_count }}</span>)</h5>
+        <div class="overflow-x-auto no-scrollbar bg-surface-container-lowest dark:bg-[#161b22] rounded-xl shadow-sm border border-outline-variant/5 dark:border-gray-800">
+            <table id="playersTable" class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="bg-surface-container-high/50 dark:bg-gray-800 text-on-surface-variant dark:text-gray-400">
+                        <th class="px-6 py-4 text-xs font-bold uppercase tracking-widest">Name</th>
+                        <th class="px-6 py-4 text-xs font-bold uppercase tracking-widest hidden md:table-cell">Guild</th>
+                        <th class="px-6 py-4 text-xs font-bold uppercase tracking-widest text-right"><a href="#" onclick="sortData('IP'); return false;" class="sort-link">IP <span id="sortIcon-IP"></span></a></th>
+                        <th class="px-6 py-4 text-xs font-bold uppercase tracking-widest text-right"><a href="#" onclick="sortData('Damage'); return false;" class="sort-link">Damage <span id="sortIcon-Damage"></span></a></th>
+                        <th class="px-6 py-4 text-xs font-bold uppercase tracking-widest text-right"><a href="#" onclick="sortData('Healing'); return false;" class="sort-link">Heal <span id="sortIcon-Healing"></span></a></th>
+                        <th class="px-6 py-4 text-xs font-bold uppercase tracking-widest text-right"><a href="#" onclick="sortData('Kills'); return false;" class="sort-link">Kills <span id="sortIcon-Kills"></span></a></th>
+                        <th class="px-6 py-4 text-xs font-bold uppercase tracking-widest text-right"><a href="#" onclick="sortData('Deaths'); return false;" class="sort-link">Deaths <span id="sortIcon-Deaths"></span></a></th>
+                        <th class="px-6 py-4 text-xs font-bold uppercase tracking-widest text-right"><a href="#" onclick="sortData('KillFame'); return false;" class="sort-link">Fame <span id="sortIcon-KillFame">▼</span></a></th>
+                    </tr>
+                </thead>
+                <tbody id="playersTableBody" class="divide-y divide-surface-variant/10 dark:divide-gray-800">
+                </tbody>
+            </table>
         </div>
-        <div class="card-body p-0">
-            
-            <!-- Filters -->
-            <div class="row g-2 p-3 bg-light border-bottom">
-                <div class="col-md-4">
-                    <select id="guildFilter" class="form-select">
-                        <option value="">All Guilds</option>
-                        {% for g in unique_guilds %}
-                            {% if g %}
-                            <option value="{{ g }}">{{ g }}</option>
-                            {% endif %}
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="col-md-4">
-                    <select id="allianceFilter" class="form-select">
-                        <option value="">All Alliances</option>
-                        {% for a in unique_alliances %}
-                            {% if a %}
-                            <option value="{{ a }}">{{ a }}</option>
-                            {% endif %}
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="col-md-4">
-                    <input type="text" id="playerFilter" class="form-control" placeholder="Search Player Name...">
-                </div>
-            </div>
-
-            <div class="table-responsive">
-                <table id="playersTable" class="table table-hover table-mobile-compact mb-0">
-                    <thead class="table-light">
-                        <tr>
-                            <th>Name</th>
-                            <th class="d-none d-md-table-cell">Guild</th>
-                            
-                            <th class="text-center"><a href="#" onclick="sortData('IP'); return false;" class="sort-link">IP <span id="sortIcon-IP"></span></a></th>
-                            <th class="text-center"><a href="#" onclick="sortData('Damage'); return false;" class="sort-link">Damage <span id="sortIcon-Damage"></span></a></th>
-                            <th class="text-center"><a href="#" onclick="sortData('Healing'); return false;" class="sort-link">Heal <span id="sortIcon-Healing"></span></a></th>
-                            <th class="text-center"><a href="#" onclick="sortData('Kills'); return false;" class="sort-link">Kills <span id="sortIcon-Kills"></span></a></th>
-                            <th class="text-center"><a href="#" onclick="sortData('Deaths'); return false;" class="sort-link">Deaths <span id="sortIcon-Deaths"></span></a></th>
-                            <th class="text-end"><a href="#" onclick="sortData('KillFame'); return false;" class="sort-link text-end pe-2">Fame <span id="sortIcon-KillFame">▼</span></a></th>
-                        </tr>
-                    </thead>
-                    <tbody id="playersTableBody">
-                    </tbody>
-                </table>
-            </div>
-        </div>
-        <!-- PLAYER PAGINATION FOOTER -->
-        <div class="card-footer bg-white">
-            <nav aria-label="Player navigation">
-                <ul class="pagination justify-content-center mb-0 pagination-sm" id="jsPagination">
-                </ul>
-            </nav>
-        </div>
-    </div>
-</div>
+        <!-- Player Pagination -->
+        <div class="flex justify-center gap-2" id="jsPagination"></div>
+    </section>
+</main>
 
 <!-- MODAL FOR KILLS/DEATHS -->
-<div class="modal fade" id="killsModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
-        <div class="modal-content">
-            <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title text-truncate" id="modalKillerName" style="max-width: 90%;"></h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body" id="killsModalBody">
-            </div>
+<div class="modal-overlay" id="killsModalOverlay">
+    <div class="modal-box">
+        <div class="flex items-center justify-between px-6 py-4 border-b border-outline-variant/20 dark:border-gray-700 dark:border-gray-700 bg-primary rounded-t-2xl">
+            <h3 class="text-white font-bold text-lg truncate" id="modalKillerName"></h3>
+            <button onclick="closeModal()" class="text-white/80 hover:text-white text-2xl leading-none">&times;</button>
+        </div>
+        <div class="p-6" id="killsModalBody">
         </div>
     </div>
 </div>
 
-{% endblock %}
+<!-- FOOTER -->
+<footer class="mt-auto py-8 text-center bg-surface-container-lowest dark:bg-[#161b22] border-t border-outline-variant/10 dark:border-gray-800" style="font-size: 0.85rem;">
+    <div class="max-w-5xl mx-auto px-4 text-on-surface-variant/80 dark:text-gray-400">
+        <p class="mb-1">Crafted with ⚔️ in the Outlands.</p>
+        <p class="mb-0 text-on-surface-variant/50 dark:text-gray-500">Not affiliated with Sandbox Interactive GmbH.</p>
+    </div>
+</footer>
 
-{% block scripts %}
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<!-- SCRIPTS -->
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script id="battle-data-json" type="application/json">
     {{ all_player_stats | tojson | safe }}
@@ -314,6 +359,29 @@
 </script>
 
 <script>
+    function escapeHtml(text) {
+        if (text == null) return "";
+        return String(text)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+    function openModal() {
+        document.getElementById('killsModalOverlay').classList.add('active');
+        document.body.style.overflow = 'hidden';
+    }
+    function closeModal() {
+        document.getElementById('killsModalOverlay').classList.remove('active');
+        document.body.style.overflow = '';
+    }
+    // Close modal on overlay click
+    document.getElementById('killsModalOverlay').addEventListener('click', function(e) {
+        if (e.target === this) closeModal();
+    });
+
     // --- DATA PARSING ---
     let battleData = [];
     let guildData = [];
@@ -359,27 +427,26 @@
 
         // --- MODAL LOGIC ---
         var currentModalEvents = [];
-        var currentModalMode = 'kills'; 
+        var currentModalMode = 'kills';
 
         // Handle Kills Click
         $(document).on('click', '.kill-count-btn', function() {
-            var pid = String($(this).data('player-id')); 
+            var pid = String($(this).data('player-id'));
             var player = battleData.find(p => String(p.Id) === pid);
-            
+
             if (player && player.Kills) {
                 currentModalEvents = player.Kills;
                 currentModalMode = 'kills';
                 $('#modalKillerName').text(player.Name + " (Kills)");
                 renderModalList();
-                var myModal = new bootstrap.Modal(document.getElementById('killsModal'));
-                myModal.show();
+                openModal();
             }
         });
 
         // Handle Deaths Click
         $(document).on('click', '.death-count-btn', function() {
-            var pid = String($(this).data('player-id')); 
-            var player = battleData.find(p => String(p.Id) === pid);       
+            var pid = String($(this).data('player-id'));
+            var player = battleData.find(p => String(p.Id) === pid);
             var dEvents = player.DeathEvents || [];
 
             if (player && dEvents.length > 0) {
@@ -387,44 +454,34 @@
                 currentModalMode = 'deaths';
                 $('#modalKillerName').text(player.Name + " (Deaths)");
                 renderModalList();
-                var myModal = new bootstrap.Modal(document.getElementById('killsModal'));
-                myModal.show();
+                openModal();
             }
         });
 
         function renderModalList() {
-            var html = '<div class="list-group list-group-flush">';
+            var html = '<div class="space-y-2">';
             
             if (currentModalEvents.length === 0) {
-                html += '<div class="p-4 text-center text-muted">No detailed event data available.</div></div>';
+                html += '<div class="p-4 text-center text-on-surface-variant/50 dark:text-gray-500">No detailed event data available.</div></div>';
                 $('#killsModalBody').html(html);
                 return;
             }
 
             currentModalEvents.forEach(function(event, index) {
                 var target = (currentModalMode === 'kills') ? event.Victim : event.Killer;
-                var badgeColor = (currentModalMode === 'kills') ? 'bg-danger' : 'bg-primary'; 
+                var badgeColor = (currentModalMode === 'kills') ? 'bg-tertiary-container text-on-tertiary-container dark:bg-tertiary/30 dark:text-tertiary-fixed-dim' : 'bg-primary text-white';
                 var roleText = (currentModalMode === 'kills') ? 'Victim' : 'Killer';
-                
+                var safeName = escapeHtml(target.Name);
+                var safeGuild = escapeHtml(target.GuildName);
+
                 html += `
-                    <a href="#" class="list-group-item list-group-item-action d-flex align-items-center modal-event-item py-3 px-2 px-sm-3" data-index="${index}">
-                        
-                        <!-- Left: Role Badge -->
-                        <div class="flex-shrink-0 me-2 me-sm-3">
-                            <span class="badge ${badgeColor}" style="width: 55px;">${roleText}</span>
+                    <a href="#" class="flex items-center gap-3 p-3 rounded-xl hover:bg-surface-container-low dark:hover:bg-surface-container-low/10 transition-colors modal-event-item cursor-pointer" data-index="${index}">
+                        <span class="inline-flex items-center justify-center px-3 py-1 rounded-lg ${badgeColor} text-xs font-bold flex-shrink-0">${roleText}</span>
+                        <div class="flex-1 min-w-0">
+                            <div class="font-bold text-on-surface dark:text-gray-200 truncate">${safeName}</div>
+                            <div class="text-xs text-on-surface-variant/60 dark:text-gray-500 truncate">${safeGuild}</div>
                         </div>
-
-                        <!-- Middle: Name & Guild (Truncates) -->
-                        <div class="flex-grow-1 text-truncate me-2">
-                            <div class="fw-bold text-truncate" style="font-size: 1rem;">${target.Name}</div>
-                            <div class="small text-muted text-truncate">${target.GuildName}</div>
-                        </div>
-
-                        <!-- Right: Fame -->
-                        <div class="flex-shrink-0 text-end">
-                            <span class="badge bg-secondary d-block">${Number(event.TotalVictimKillFame).toLocaleString()}</span>
-                            <small class="text-muted d-none d-sm-block" style="font-size: 0.7em;">Fame</small>
-                        </div>
+                        <span class="inline-flex items-center px-2 py-1 bg-surface-container rounded-lg text-xs font-bold text-on-surface dark:text-gray-200 flex-shrink-0">${Number(event.TotalVictimKillFame).toLocaleString()}</span>
                     </a>
                 `;
             });
@@ -441,7 +498,11 @@
         function renderEventDetail(event) {
             var k = event.Killer;
             var v = event.Victim;
-            
+            var kName = escapeHtml(k.Name);
+            var kGuild = escapeHtml(k.GuildName);
+            var vName = escapeHtml(v.Name);
+            var vGuild = escapeHtml(v.GuildName);
+
             function itemHtml(item, color) {
                 if (!item) return `<div class="mini-grid-item" style="background-color:${color}"></div>`;
                 return `
@@ -453,9 +514,9 @@
             }
 
             function buildGearGrid(equip, color) {
-                if (!equip) return '<div class="text-muted small">No Gear</div>';
+                if (!equip) return '<div class="text-on-surface-variant/50 dark:text-gray-500 text-sm">No Gear</div>';
                 return `
-                    <div class="d-flex flex-wrap justify-content-center gear-container">
+                    <div class="flex flex-wrap justify-center gear-container">
                         ${itemHtml(equip.Bag, color)}
                         ${itemHtml(equip.Head, color)}
                         ${itemHtml(equip.Cape, color)}
@@ -471,46 +532,38 @@
             }
 
             var html = `
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <button class="btn btn-sm btn-outline-secondary" id="backToList">&larr; Back</button>
-                    <small class="text-muted">Event Detail</small>
+                <div class="flex justify-between items-center mb-4">
+                    <button class="px-4 py-1.5 border border-outline-variant/30 dark:border-gray-700 rounded-lg text-sm font-semibold text-primary dark:text-primary-fixed-dim hover:bg-surface-container-low dark:hover:bg-surface-container-low/10 transition-colors" id="backToList">&larr; Back</button>
+                    <span class="text-xs text-on-surface-variant/50 dark:text-gray-500">Event Detail</span>
                 </div>
                 
-                <div class="row g-3">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <!-- Killer Column -->
-                    <div class="col-12 col-md-6 text-center border-end-md">
-                        <div class="p-2 border rounded bg-light-subtle h-100">
-                            <h6 class="text-primary fw-bold mb-0">${k.Name}</h6>
-                            <small class="d-block mb-2 text-muted">${k.GuildName}</small>
-                            <div class="mt-2">
-                                ${buildGearGrid(k.Equipment, 'hsla(145, 100%, 50%, 0.2)')}
-                            </div>
-                        </div>
+                    <div class="text-center p-4 bg-surface-container-low/30 dark:bg-gray-800/30 rounded-xl">
+                        <h6 class="text-primary dark:text-primary-fixed-dim font-bold">${kName}</h6>
+                        <div class="text-xs text-on-surface-variant/60 dark:text-gray-500 mb-3">${kGuild}</div>
+                        ${buildGearGrid(k.Equipment, 'hsla(145, 100%, 50%, 0.2)')}
                     </div>
                     
                     <!-- Victim Column -->
-                    <div class="col-12 col-md-6 text-center border-top border-md-top-0 pt-3 pt-md-0">
-                        <div class="p-2 border rounded bg-light-subtle h-100">
-                            <h6 class="text-danger fw-bold mb-0">${v.Name}</h6>
-                            <small class="d-block mb-2 text-muted">${v.GuildName}</small>
-                            <div class="mt-2">
-                                ${buildGearGrid(v.Equipment, 'hsla(0, 80%, 43%, 0.2)')}
-                            </div>
-                        </div>
+                    <div class="text-center p-4 bg-error-container/20 dark:bg-error-container/10 rounded-xl">
+                        <h6 class="text-tertiary dark:text-tertiary-fixed-dim font-bold">${vName}</h6>
+                        <div class="text-xs text-on-surface-variant/60 dark:text-gray-500 mb-3">${vGuild}</div>
+                        ${buildGearGrid(v.Equipment, 'hsla(0, 80%, 43%, 0.2)')}
                     </div>
                 </div>
                 
-                <hr class="my-4">
+                <hr class="my-4 border-outline-variant/20 dark:border-gray-700 dark:border-gray-700">
                 
-                <h6 class="text-center mb-3">Victim Inventory</h6>
-                <div class="d-flex flex-wrap justify-content-center gap-1">
+                <h6 class="text-center font-bold mb-3 text-sm">Victim Inventory</h6>
+                <div class="flex flex-wrap justify-center gap-1">
             `;
 
             if (v.Inventory) {
                 v.Inventory.forEach(function(item) {
                     if (item) {
                         html += `
-                            <div class="mini-grid-item bg-light border">
+                            <div class="mini-grid-item bg-surface-container-low border border-outline-variant/10 dark:border-gray-800 dark:border-gray-700 dark:border-gray-700">
                                 <img src="https://render.albiononline.com/v1/item/${item.Type}.png?count=1&quality=${item.Quality}">
                                 <span class="mini-item-count">${item.Count}</span>
                             </div>
@@ -518,7 +571,7 @@
                     }
                 });
             } else {
-                html += '<p class="text-muted small">Empty Inventory</p>';
+                html += '<p class="text-on-surface-variant/50 dark:text-gray-500 text-sm">Empty Inventory</p>';
             }
             html += '</div>';
 
@@ -570,7 +623,7 @@
     }
 
     function sortAndRender() {
-        $('.sort-link span[id^="sortIcon-"]').text(''); 
+        $('.sort-link span[id^="sortIcon-"]').text('');
         var icon = (currentOrder === 'desc') ? '▼' : '▲';
         $('#sortIcon-' + currentSort).text(icon);
 
@@ -582,9 +635,8 @@
                 valA = valA ? valA.length : 0;
                 valB = valB ? valB.length : 0;
             } else if (currentSort === 'Deaths') {
-                 // For sorting, use the integer count
-                 valA = (valA === undefined) ? 0 : valA;
-                 valB = (valB === undefined) ? 0 : valB;
+                valA = (valA === undefined) ? 0 : valA;
+                valB = (valB === undefined) ? 0 : valB;
             } else {
                 if (valA === undefined || valA === null) valA = 0;
                 if (valB === undefined || valB === null) valB = 0;
@@ -608,48 +660,51 @@
         var pageData = filteredData.slice(start, end);
 
         if (pageData.length === 0) {
-            tbody.append('<tr><td colspan="8" class="text-center py-3">No players found.</td></tr>');
+            tbody.append('<tr><td colspan="8" class="px-6 py-8 text-center text-on-surface-variant/50 dark:text-gray-500 text-sm">No players found.</td></tr>');
             return;
         }
 
         pageData.forEach(p => {
             var killCount = (p.Kills && p.Kills.length) ? p.Kills.length : 0;
-            var killBadge = killCount > 0 
-                ? `<span class="badge bg-primary kill-count-btn" data-player-id="${p.Id}">${killCount}</span>`
-                : `<span class="badge bg-primary">0</span>`;
-            
+            var killBadge = killCount > 0
+                ? `<span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-tertiary-container dark:bg-tertiary/30 text-on-tertiary-container dark:text-tertiary-fixed-dim font-black text-xs kill-count-btn cursor-pointer" data-player-id="${p.Id}">${killCount}</span>`
+                : `<span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-surface-container dark:bg-gray-800 text-on-surface-variant dark:text-gray-400 text-xs font-medium">0</span>`;
+
             var deathCount = (p.DeathEvents && p.DeathEvents.length > 0) ? p.DeathEvents.length : p.Deaths;
             var deathBadge;
             if (p.DeathEvents && p.DeathEvents.length > 0) {
-                 deathBadge = `<span class="badge bg-danger death-count-btn" data-player-id="${p.Id}">${deathCount}</span>`;
+                deathBadge = `<span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-error-container dark:bg-error-container/30 text-on-error-container dark:text-red-400 font-black text-xs death-count-btn cursor-pointer" data-player-id="${p.Id}">${deathCount}</span>`;
             } else if (deathCount > 0) {
-                 deathBadge = `<span class="badge bg-danger">${deathCount}</span>`;
+                deathBadge = `<span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-error-container dark:bg-error-container/30 text-on-error-container dark:text-red-400 font-medium text-xs">${deathCount}</span>`;
             } else {
-                 deathBadge = `<span class="badge bg-danger">0</span>`;
+                deathBadge = `<span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-surface-container dark:bg-gray-800 text-on-surface-variant dark:text-gray-400 text-xs font-medium">0</span>`;
             }
 
-            var damageVal = p.Damage > 0 ? `<span class="text-danger">${Number(p.Damage).toLocaleString()}</span>` : `<span class="text-danger">0</span>`;
-            var healVal = p.Healing > 0 ? `<span class="text-success">${Number(p.Healing).toLocaleString()}</span>` : `<span class="text-success">0</span>`;
-            var fameVal = `<span class="badge bg-warning text-dark">${Number(p.KillFame).toLocaleString()}</span>`;
+            var damageVal = p.Damage > 0 ? `<span class="text-tertiary dark:text-tertiary-fixed-dim font-medium">${Number(p.Damage).toLocaleString()}</span>` : `<span class="text-on-surface-variant/40 dark:text-gray-500">0</span>`;
+            var healVal = p.Healing > 0 ? `<span class="text-green-600 font-medium">${Number(p.Healing).toLocaleString()}</span>` : `<span class="text-on-surface-variant/40 dark:text-gray-500">0</span>`;
+            var fameVal = `<span class="font-bold text-primary dark:text-primary-fixed-dim">${Number(p.KillFame).toLocaleString()}</span>`;
+            var safeName = escapeHtml(p.Name);
+            var safeGuild = escapeHtml(p.GuildName);
+            var safeAlliance = escapeHtml(p.AllianceName);
 
-            var allianceHtml = p.AllianceName ? `<br><small class="text-muted"><span class="badge bg-secondary text-white">${p.AllianceName}</span></small>` : '';
+            var allianceHtml = safeAlliance ? `<br><span class="text-[10px] text-on-surface-variant/50 dark:text-gray-500 font-medium">${safeAlliance}</span>` : '';
 
             var row = `
-                <tr>
-                    <td>
-                        <a href="/player/${p.Id}" class="text-decoration-none text-dark">${p.Name}</a>
-                        <div class="small text-muted d-md-none">${p.GuildName}</div>
+                <tr class="hover:bg-surface-container-low dark:hover:bg-surface-container-low/10 transition-colors">
+                    <td class="px-6 py-5">
+                        <a href="/player/${p.Id}" class="font-bold text-on-surface dark:text-gray-200 hover:text-primary dark:text-primary-fixed-dim transition-colors">${safeName}</a>
+                        <div class="text-xs text-on-surface-variant/60 dark:text-gray-500 md:hidden">${safeGuild}</div>
                     </td>
-                    <td class="d-none d-md-table-cell">
-                        ${p.GuildName}
+                    <td class="px-6 py-5 text-on-surface-variant/70 dark:text-gray-400 text-sm hidden md:table-cell">
+                        ${safeGuild}
                         ${allianceHtml}
                     </td>
-                    <td class="text-center">${p.IP}</td>
-                    <td class="text-center">${damageVal}</td>
-                    <td class="text-center">${healVal}</td>
-                    <td class="text-center">${killBadge}</td>
-                    <td class="text-center">${deathBadge}</td>
-                    <td class="text-end">${fameVal}</td>
+                    <td class="px-6 py-5 text-right font-mono text-sm">${p.IP}</td>
+                    <td class="px-6 py-5 text-right">${damageVal}</td>
+                    <td class="px-6 py-5 text-right">${healVal}</td>
+                    <td class="px-6 py-5 text-right">${killBadge}</td>
+                    <td class="px-6 py-5 text-right">${deathBadge}</td>
+                    <td class="px-6 py-5 text-right">${fameVal}</td>
                 </tr>
             `;
             tbody.append(row);
@@ -663,25 +718,13 @@
 
         if (totalPages <= 1) return;
 
-        var prevClass = (currentPage <= 1) ? 'disabled' : '';
-        nav.append(`
-            <li class="page-item ${prevClass}">
-                <a class="page-link" href="#" onclick="changePage(${currentPage - 1}); return false;">Prev</a>
-            </li>
-        `);
+        var prevClass = (currentPage <= 1) ? 'opacity-50 cursor-not-allowed pointer-events-none' : 'cursor-pointer hover:bg-surface-container-low dark:hover:bg-surface-container-low/10';
+        nav.append(`<span class="h-8 px-3 flex items-center justify-center rounded-lg border border-outline-variant/20 dark:border-gray-700 dark:border-gray-700 text-xs font-semibold text-primary dark:text-primary-fixed-dim ${prevClass}" onclick="changePage(${currentPage - 1})">Prev</span>`);
 
-        nav.append(`
-            <li class="page-item disabled">
-                <span class="page-link text-muted">${currentPage}/${totalPages}</span>
-            </li>
-        `);
+        nav.append(`<span class="h-8 px-3 flex items-center justify-center text-xs text-on-surface-variant/60 dark:text-gray-500">${currentPage}/${totalPages}</span>`);
 
-        var nextClass = (currentPage >= totalPages) ? 'disabled' : '';
-        nav.append(`
-            <li class="page-item ${nextClass}">
-                <a class="page-link" href="#" onclick="changePage(${currentPage + 1}); return false;">Next</a>
-            </li>
-        `);
+        var nextClass = (currentPage >= totalPages) ? 'opacity-50 cursor-not-allowed pointer-events-none' : 'cursor-pointer hover:bg-surface-container-low dark:hover:bg-surface-container-low/10';
+        nav.append(`<span class="h-8 px-3 flex items-center justify-center rounded-lg border border-outline-variant/20 dark:border-gray-700 dark:border-gray-700 text-xs font-semibold text-primary dark:text-primary-fixed-dim ${nextClass}" onclick="changePage(${currentPage + 1})">Next</span>`);
     }
 
     window.changePage = function(newPage) {
@@ -690,9 +733,7 @@
         currentPage = newPage;
         renderTable();
         renderPagination();
-        $('html, body').animate({
-            scrollTop: $("#playersTable").offset().top - 100
-        }, 200);
+        document.getElementById('playersTable').scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
     // ==========================================
@@ -740,29 +781,26 @@
         var pageData = guildData.slice(start, end);
 
         if (pageData.length === 0) {
-            tbody.append('<tr><td colspan="5" class="text-center">No guild data available.</td></tr>');
+            tbody.append('<tr><td colspan="5" class="px-6 py-8 text-center text-on-surface-variant/50 dark:text-gray-500 text-sm">No guild data available.</td></tr>');
             return;
         }
 
         pageData.forEach(g => {
-            var allianceHtml = g.alliance ? `<br><span class="badge bg-secondary text-white" style="font-size: 0.7em !important;">${g.alliance}</span>` : '';
+            var safeGuildName = escapeHtml(g.name);
+            var safeAlliance = escapeHtml(g.alliance);
+            var allianceHtml = safeAlliance ? `<br><span class="text-[10px] text-on-surface-variant/50 dark:text-gray-500">${safeAlliance}</span>` : '';
             var pCount = g.playerCount || 0;
             var kills = g.kills || 0;
             var deaths = g.deaths || 0;
             var fame = Number(g.killFame || 0).toLocaleString();
 
             var row = `
-                <tr>
-                    <td>
-                        ${g.name}
-                        ${allianceHtml}
-                    </td>
-                    <td class="text-center">
-                        <span class="text-dark">${pCount}</span>
-                    </td>
-                    <td class="text-center">${kills}</td>
-                    <td class="text-center">${deaths}</td>
-                    <td class="text-end">${fame}</td>
+                <tr class="hover:bg-surface-container-low dark:hover:bg-surface-container-low/10 transition-colors">
+                    <td class="px-6 py-6 font-bold">${safeGuildName}${allianceHtml}</td>
+                    <td class="px-6 py-6 text-right font-medium">${pCount}</td>
+                    <td class="px-6 py-6 text-right font-bold text-tertiary dark:text-tertiary-fixed-dim">${kills}</td>
+                    <td class="px-6 py-6 text-right font-medium">${deaths}</td>
+                    <td class="px-6 py-6 text-right font-bold">${fame}</td>
                 </tr>
             `;
             tbody.append(row);
@@ -776,25 +814,13 @@
 
         if (totalPages <= 1) return;
 
-        var prevClass = (currentGuildPage <= 1) ? 'disabled' : '';
-        nav.append(`
-            <li class="page-item ${prevClass}">
-                <a class="page-link" href="#" onclick="changeGuildPage(${currentGuildPage - 1}); return false;">Prev</a>
-            </li>
-        `);
+        var prevClass = (currentGuildPage <= 1) ? 'opacity-50 cursor-not-allowed pointer-events-none' : 'cursor-pointer hover:bg-surface-container-low dark:hover:bg-surface-container-low/10';
+        nav.append(`<span class="h-8 px-3 flex items-center justify-center rounded-lg border border-outline-variant/20 dark:border-gray-700 dark:border-gray-700 text-xs font-semibold text-primary dark:text-primary-fixed-dim ${prevClass}" onclick="changeGuildPage(${currentGuildPage - 1})">Prev</span>`);
 
-        nav.append(`
-            <li class="page-item disabled">
-                <span class="page-link text-muted">${currentGuildPage}/${totalPages}</span>
-            </li>
-        `);
+        nav.append(`<span class="h-8 px-3 flex items-center justify-center text-xs text-on-surface-variant/60 dark:text-gray-500">${currentGuildPage}/${totalPages}</span>`);
 
-        var nextClass = (currentGuildPage >= totalPages) ? 'disabled' : '';
-        nav.append(`
-            <li class="page-item ${nextClass}">
-                <a class="page-link" href="#" onclick="changeGuildPage(${currentGuildPage + 1}); return false;">Next</a>
-            </li>
-        `);
+        var nextClass = (currentGuildPage >= totalPages) ? 'opacity-50 cursor-not-allowed pointer-events-none' : 'cursor-pointer hover:bg-surface-container-low dark:hover:bg-surface-container-low/10';
+        nav.append(`<span class="h-8 px-3 flex items-center justify-center rounded-lg border border-outline-variant/20 dark:border-gray-700 dark:border-gray-700 text-xs font-semibold text-primary dark:text-primary-fixed-dim ${nextClass}" onclick="changeGuildPage(${currentGuildPage + 1})">Next</span>`);
     }
 
     window.changeGuildPage = function(newPage) {
@@ -804,6 +830,14 @@
         renderGuildTable();
         renderGuildPagination();
     }
-
 </script>
-{% endblock %}
+<script>
+    // Dark mode toggle with localStorage persistence
+    document.getElementById('themeToggle').addEventListener('click', function() {
+        const isDark = document.documentElement.classList.toggle('dark');
+        document.documentElement.classList.toggle('light', !isDark);
+        localStorage.setItem('ao-dark-mode', isDark);
+    });
+</script>
+</body>
+</html>

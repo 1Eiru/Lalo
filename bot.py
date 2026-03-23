@@ -699,7 +699,7 @@ def create_embed(doc, est_value):
 
     embed = discord.Embed(
         title=title,
-        url=f"https://lalo-kb.onrender.com/events/{doc['EventId']}",
+        url=f"https://ao-kb.fly.dev/events/{doc['EventId']}",
         color=color
     )
     
@@ -715,7 +715,7 @@ def create_embed(doc, est_value):
             continue
 
         if p_name and p_id:
-            link = f"[**{p_name}**](https://lalo-kb.onrender.com/player/{p_id})"
+            link = f"[**{p_name}**](https://ao-kb.fly.dev/player/{p_id})"
             participant_links.append(link)
 
     if participant_links:
@@ -751,7 +751,7 @@ def create_embed(doc, est_value):
         log(f"Time formatting error: {e}")
         formatted_time = doc.get('TimeStamp', 'Unknown Time')
 
-    event_url = f"https://lalo-kb.onrender.com/events/{doc['EventId']}"
+    event_url = f"https://ao-kb.fly.dev/events/{doc['EventId']}"
     
     embed.set_footer(text=f"Event ID: {doc['EventId']} | {formatted_time}\n{event_url}")
     embed.set_image(url="attachment://killboard.png")

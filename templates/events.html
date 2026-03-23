@@ -1,214 +1,250 @@
-{% extends "base.html" %}
-{% block content %}
-<div class="container mt-4">
-    <div class="row">
-        <!--FIRST COLUMN [KILLER]-->
-        {% for event in events %}
-        <div class="col-md-6 pe-md-4 mb-4 mb-md-0">
-            <div class="d-flex justify-content-between align-items-center">
-                <h6>Killer 🩸: <a href="{{ url_for('player', player_id=event.Killer.Id) }}" class="killer-link">{{event.Killer.Name}}</a></h6>
-                <span class="badge bg-primary">{{ "{:,}".format(event.Killer.KillFame)}} Fame</span>
-            </div>
-            <h6 class="text-muted small">Guild 🏰: {{event.Killer.GuildName}}</h6>
-            <div class="row row-cols-3 shadow-sm bg-light justify-content-center p-2 rounded">
-                <div class="col">
-                    <div class="grid-item" style="background-color: hsla(145, 100%, 50%, 0.226);">
-                       {% if event.Killer.Equipment.Bag.Type %}
-                        <img src="https://render.albiononline.com/v1/item/{{ event.Killer.Equipment.Bag.Type }}.png?count=1&quality={{event.Killer.Equipment.Bag.Quality}}">
+<!DOCTYPE html>
+<html class="light" lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>Kill Event - AO KillBoard</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "surface": "#f6faff",
+                        "surface-container-highest": "#dbe4ed",
+                        "inverse-surface": "#293138",
+                        "on-tertiary": "#ffffff",
+                        "on-primary-container": "#ffffff",
+                        "tertiary": "#b91830",
+                        "primary-fixed-dim": "#b1c5ff",
+                        "surface-container-high": "#e0e9f2",
+                        "surface-container": "#e6eff8",
+                        "on-error-container": "#93000a",
+                        "on-secondary-fixed": "#181c20",
+                        "on-background": "#141d23",
+                        "outline": "#727787",
+                        "primary": "#0057cd",
+                        "secondary": "#5b5f63",
+                        "outline-variant": "#c2c6d8",
+                        "on-primary": "#ffffff",
+                        "on-secondary": "#ffffff",
+                        "surface-container-lowest": "#ffffff",
+                        "on-surface": "#141d23",
+                        "secondary-container": "#dde0e5",
+                        "tertiary-container": "#dd3645",
+                        "on-error": "#ffffff",
+                        "error-container": "#ffdad6",
+                        "surface-variant": "#dbe4ed",
+                        "error": "#ba1a1a",
+                        "surface-container-low": "#ecf5fe",
+                        "primary-container": "#0d6efd",
+                        "on-surface-variant": "#424655",
+                        "on-tertiary-container": "#130001"
+                    },
+                    fontFamily: {
+                        "headline": ["Inter"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    },
+                    borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+                },
+            },
+        }
+    </script>
+    <!-- Restore dark mode before paint to avoid flash -->
+    <script>
+        if (localStorage.getItem('ao-dark-mode') === 'true') {
+            document.documentElement.classList.remove('light');
+            document.documentElement.classList.add('dark');
+        }
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f6faff; }
+        .dark body { background-color: #0d1117; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .gear-slot {
+            height: 64px;
+            width: 64px;
+            border-radius: 10px;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .gear-slot img { max-width: 100%; max-height: 100%; }
+        .item-count {
+            position: absolute;
+            bottom: 2px;
+            right: 2px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            font-size: 10px;
+            padding: 0 3px;
+            border-radius: 2px;
+        }
+        @media (max-width: 576px) {
+            .gear-slot { height: 50px; width: 50px; }
+        }
+    </style>
+</head>
+<body class="bg-surface dark:bg-[#0d1117] text-on-surface dark:text-gray-200 min-h-screen transition-colors duration-300">
+
+<!-- Top Navigation Bar -->
+<nav class="w-full sticky top-0 z-50 bg-[#ffffff]/70 dark:bg-[#0d1117]/80 backdrop-blur-md font-['Inter'] antialiased text-sm tracking-tight border-b border-outline-variant/10 dark:border-gray-800">
+    <div class="flex justify-between items-center h-16 px-8 max-w-5xl mx-auto">
+        <a href="/" class="text-xl font-bold tracking-tighter text-[#141d23] dark:text-white hover:opacity-80 transition-opacity">AO KillBoard</a>
+        <button id="themeToggle" class="p-2 rounded-xl bg-surface-container dark:bg-gray-800 text-on-surface-variant dark:text-gray-400 hover:bg-surface-container-high dark:hover:bg-gray-700 transition-colors flex items-center justify-center">
+            <span class="material-symbols-outlined dark:hidden" data-icon="dark_mode">dark_mode</span>
+            <span class="material-symbols-outlined hidden dark:block" data-icon="light_mode">light_mode</span>
+        </button>
+    </div>
+</nav>
+
+<main class="max-w-5xl mx-auto px-4 md:px-8 py-12">
+    {% for event in events %}
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+
+        <!-- KILLER COLUMN -->
+        <div class="space-y-6">
+            <div class="bg-surface-container-lowest dark:bg-[#161b22] rounded-2xl p-6 shadow-sm border border-outline-variant/10 dark:border-gray-800 dark:border-gray-700 dark:border-gray-700">
+                <!-- Killer Header -->
+                <div class="flex items-center justify-between mb-4">
+                    <div>
+                        <div class="text-xs uppercase tracking-[0.1em] text-on-surface-variant/50 dark:text-gray-500 font-bold mb-1">Killer</div>
+                        <a href="{{ url_for('player', player_id=event.Killer.Id) }}" class="text-xl font-extrabold text-primary dark:text-primary-fixed-dim hover:underline">{{ event.Killer.Name }}</a>
+                    </div>
+                    <span class="inline-flex items-center px-3 py-1.5 bg-primary text-white text-xs font-bold rounded-lg">{{ "{:,}".format(event.Killer.KillFame) }} Fame</span>
+                </div>
+                <div class="text-sm text-on-surface-variant/60 dark:text-gray-500 font-medium mb-6">
+                    <span class="material-symbols-outlined text-sm align-middle" data-icon="shield">shield</span>
+                    {{ event.Killer.GuildName }}
+                </div>
+
+                <!-- Killer Equipment Grid -->
+                <div class="flex flex-wrap justify-center gap-1.5 max-w-[220px] mx-auto">
+                    {% set k_equip = event.Killer.Equipment %}
+                    {% set k_slots = ['Bag', 'Head', 'Cape', 'MainHand', 'Armor', 'OffHand', 'Potion', 'Shoes', 'Food', 'Mount'] %}
+                    {% for slot in k_slots %}
+                    <div class="gear-slot" style="background-color: hsla(145, 100%, 50%, 0.15);">
+                        {% if k_equip[slot] and k_equip[slot].Type %}
+                        <img src="https://render.albiononline.com/v1/item/{{ k_equip[slot].Type }}.png?count=1&quality={{ k_equip[slot].Quality }}">
+                        {% if slot in ['Potion', 'Food'] and k_equip[slot].Count %}
+                        <span class="item-count">{{ k_equip[slot].Count }}</span>
+                        {% endif %}
                         {% endif %}
                     </div>
-                </div>
-                <div class="col">
-                    <div class="grid-item" style="background-color: hsla(145, 100%, 50%, 0.226);">
-                        {% if event.Killer.Equipment.Head.Type %}
-                        <img src="https://render.albiononline.com/v1/item/{{ event.Killer.Equipment.Head.Type }}.png?count=1&quality={{event.Killer.Equipment.Head.Quality}}">
-                        {% endif %}
-                    </div>
-                </div>
-                <div class="col">
-                    <div class="grid-item" style="background-color: hsla(145, 100%, 50%, 0.226);">
-                        {% if event.Killer.Equipment.Cape.Type %}
-                        <img src="https://render.albiononline.com/v1/item/{{ event.Killer.Equipment.Cape.Type }}.png?count=1&quality={{event.Killer.Equipment.Cape.Quality}}">
-                        {% endif %}
-                    </div>
-                </div>
-                <div class="col">
-                    <div class="grid-item" style="background-color: hsla(145, 100%, 50%, 0.226);">
-                        {% if event.Killer.Equipment.MainHand.Type %}
-                        <img src="https://render.albiononline.com/v1/item/{{ event.Killer.Equipment.MainHand.Type }}.png?count=1&quality={{event.Killer.Equipment.MainHand.Quality}}">
-                        {% endif %}
-                    </div>
-                </div>
-                <div class="col">
-                    <div class="grid-item" style="background-color: hsla(145, 100%, 50%, 0.226);">
-                        {% if event.Killer.Equipment.Armor.Type %}
-                        <img src="https://render.albiononline.com/v1/item/{{ event.Killer.Equipment.Armor.Type }}.png?count=1&quality={{event.Killer.Equipment.Armor.Quality}}">
-                        {% endif %}
-                    </div>
-                </div>
-                <div class="col">
-                    <div class="grid-item" style="background-color: hsla(145, 100%, 50%, 0.226);">
-                        {% if event.Killer.Equipment.OffHand.Type %}
-                        <img src="https://render.albiononline.com/v1/item/{{ event.Killer.Equipment.OffHand.Type }}.png?count=1&quality={{event.Killer.Equipment.OffHand.Quality}}">
-                        {% endif %}
-                    </div>
-                </div>
-                <div class="col">
-                    <div class="grid-item" style="background-color: hsla(145, 100%, 50%, 0.226);">
-                        {% if event.Killer.Equipment.Potion.Type %}
-                        <img src="https://render.albiononline.com/v1/item/{{ event.Killer.Equipment.Potion.Type }}.png?count=1&quality={{event.Killer.Equipment.Potion.Quality}}">
-                        <span class="item-count">{{event.Killer.Equipment.Potion.Count}}</span>
-                        {% endif %}
-                    </div>
-                </div>
-                <div class="col">
-                    <div class="grid-item" style="background-color: hsla(145, 100%, 50%, 0.226);">
-                        {% if event.Killer.Equipment.Shoes.Type %}
-                        <img src="https://render.albiononline.com/v1/item/{{ event.Killer.Equipment.Shoes.Type }}.png?count=1&quality={{event.Killer.Equipment.Shoes.Quality}}">
-                        {% endif %}
-                    </div>
-                </div>
-                <div class="col">
-                    <div class="grid-item" style="background-color: hsla(145, 100%, 50%, 0.226);">
-                        {% if event.Killer.Equipment.Food.Type %}
-                        <img src="https://render.albiononline.com/v1/item/{{ event.Killer.Equipment.Food.Type }}.png?count=1&quality={{event.Killer.Equipment.Food.Quality}}" >
-                        <span class="item-count">{{event.Killer.Equipment.Food.Count}}</span>
-                        {% endif %}
-                    </div>
-                </div>
-                <div class="col">
-                    <div class="grid-item" style="background-color: hsla(145, 100%, 50%, 0.226);">
-                        {% if event.Killer.Equipment.Mount.Type %}
-                        <img src="https://render.albiononline.com/v1/item/{{ event.Killer.Equipment.Mount.Type }}.png?count=1&quality={{event.Killer.Equipment.Mount.Quality}}">
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-            <!--PARTICIPANTS-->
-            <hr>
-            <h6>Participants</h6>
-            <div class="list-group">
-                {% for i in event.Participants %}
-                    {% if i.Name != event.Killer.Name %}
-                    <div class="list-group-item list-group-item-action flex-column align-items-start">
-                        <div class="d-flex w-100 justify-content-between">
-                            <h6 class="mb-1"><a href="{{ url_for('player', player_id=i.Id) }}" class="text-decoration-none text-dark">{{i.Name}}</a></h6>
-                            <small>Guild: {{i.GuildName}}</small>
-                        </div>
-                        <div class="d-flex justify-content-between small">
-                            {% if i.DamageDone != 0 %}<span>⚔️ {{"{:,}".format(i.DamageDone)}}</span>{% endif %}
-                            {% if i.SupportHealingDone != 0 %}<span>🍃 {{"{:,}".format(i.SupportHealingDone)}}</span>{% endif %}
-                        </div>
-                    </div>
-                    {% endif %}
-                {% endfor %}
-            </div>
-        </div>
-        <!--SECOND COLUMN [VICTIM]-->
-        <div class="col-md-6 ps-md-4 mt-4 mt-md-0">
-            <div class="d-flex justify-content-between align-items-center">
-                <h6>Victim 💀: <a href="{{ url_for('player', player_id=event.Victim.Id) }}" class="victim-link">{{event.Victim.Name}}</a></h6>
-                <span class="badge bg-danger">{{"{:,}".format(event.Victim.DeathFame)}} Fame</span>
-            </div>
-            <h6 class="text-muted small">Guild 🏰: {{event.Victim.GuildName}}</h6>
-            <div class="row row-cols-3 shadow-sm bg-light justify-content-center p-2 rounded">
-                <div class="col">
-                        <div class="grid-item" style="background-color: hsla(0, 80%, 43%, 0.493);">
-                            {% if event.Victim.Equipment.Bag.Type %}
-                            <img src="https://render.albiononline.com/v1/item/{{ event.Victim.Equipment.Bag.Type }}.png?count=1&quality={{event.Victim.Equipment.Bag.Quality}}">
-                            {% endif %}
-                        </div>
-                </div>
-                <div class="col">
-                    <div class="grid-item" style="background-color: hsla(0, 80%, 43%, 0.493);">
-                        {% if event.Victim.Equipment.Head.Type %}
-                        <img src="https://render.albiononline.com/v1/item/{{ event.Victim.Equipment.Head.Type }}.png?count=1&quality={{event.Victim.Equipment.Head.Quality}}">
-                        {% endif %}
-                    </div>
-                </div>
-                <div class="col">
-                    <div class="grid-item" style="background-color: hsla(0, 80%, 43%, 0.493);">
-                        {% if event.Victim.Equipment.Cape.Type %}
-                        <img src="https://render.albiononline.com/v1/item/{{ event.Victim.Equipment.Cape.Type }}.png?count=1&quality={{event.Victim.Equipment.Cape.Quality}}">
-                        {% endif %}
-                    </div>
-                </div>
-                <div class="col">
-                    <div class="grid-item" style="background-color: hsla(0, 80%, 43%, 0.493);">
-                        {% if event.Victim.Equipment.MainHand.Type %}
-                        <img src="https://render.albiononline.com/v1/item/{{ event.Victim.Equipment.MainHand.Type }}.png?count=1&quality={{event.Victim.Equipment.MainHand.Quality}}">
-                        {% endif %}
-                    </div>
-                </div>
-                <div class="col">
-                    <div class="grid-item" style="background-color: hsla(0, 80%, 43%, 0.493);">
-                        {% if event.Victim.Equipment.Armor.Type %}
-                        <img src="https://render.albiononline.com/v1/item/{{ event.Victim.Equipment.Armor.Type }}.png?count=1&quality={{event.Victim.Equipment.Armor.Quality}}">
-                        {% endif %}
-                    </div>
-                </div>
-                <div class="col">
-                    <div class="grid-item" style="background-color: hsla(0, 80%, 43%, 0.493);">
-                        {% if event.Victim.Equipment.OffHand.Type %}
-                        <img src="https://render.albiononline.com/v1/item/{{ event.Victim.Equipment.OffHand.Type }}.png?count=1&quality={{event.Victim.Equipment.OffHand.Quality}}">
-                        {% endif %}
-                    </div>
-                </div>
-                <div class="col">
-                    <div class="grid-item" style="background-color: hsla(0, 80%, 43%, 0.493);">
-                        {% if event.Victim.Equipment.Potion.Type %}
-                        <img src="https://render.albiononline.com/v1/item/{{ event.Victim.Equipment.Potion.Type }}.png?count=1&quality={{event.Victim.Equipment.Potion.Quality}}">
-                        <span class="item-count">{{event.Victim.Equipment.Potion.Count}}</span>
-                        {% endif %}
-                    </div>
-                </div>
-                <div class="col">
-                    <div class="grid-item" style="background-color: hsla(0, 80%, 43%, 0.493);">
-                        {% if event.Victim.Equipment.Shoes.Type %}
-                        <img src="https://render.albiononline.com/v1/item/{{ event.Victim.Equipment.Shoes.Type }}.png?count=1&quality={{event.Victim.Equipment.Shoes.Quality}}">
-                        {% endif %}
-                    </div>
-                </div>
-                <div class="col">
-                    <div class="grid-item" style="background-color: hsla(0, 80%, 43%, 0.493);">
-                        {% if event.Victim.Equipment.Food.Type %}
-                        <img src="https://render.albiononline.com/v1/item/{{ event.Victim.Equipment.Food.Type }}.png?count=1&quality={{event.Victim.Equipment.Food.Quality}}">
-                        <span class="item-count">{{event.Victim.Equipment.Food.Count}}</span>       
-                        {% endif %}
-                    </div>
-                </div>
-                <div class="col">
-                    <div class="grid-item" style="background-color: hsla(0, 80%, 43%, 0.493);">
-                        {% if event.Victim.Equipment.Mount.Type %}
-                        <img src="https://render.albiononline.com/v1/item/{{ event.Victim.Equipment.Mount.Type }}.png?count=1&quality={{event.Victim.Equipment.Mount.Quality}}">
-                        {% endif %}
-                    </div>
+                    {% endfor %}
                 </div>
             </div>
-            
-            <hr>
-            <!-- INVENTORY VICTIM -->
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <h6 class="mb-0">Inventory</h6>
-                <small class="text-danger fw-bold">Loss: {{ "{:,}".format(estimated_loss) }} 💰</small>
-            </div>
-            
-            <div class="container border shadow-sm p-2 rounded">
-                <div class="row g-2"> 
-                    {% for i in event.Victim.Inventory %}
-                        {% if i %}
-                            <div class="col-3 col-md-2">
-                                <div class="position-relative border rounded d-flex justify-content-center align-items-center bg-white" style="aspect-ratio: 1;">
-                                    <img src="https://render.albiononline.com/v1/item/{{ i.Type }}.png?count=1&quality={{i.Quality}}" class="img-fluid">
-                                    <span class="item-count" style="bottom: 2px; right: 2px; font-size: 0.75rem;">{{i.Count}}</span>
-                                </div>
+
+            <!-- Participants -->
+            <div class="bg-surface-container-lowest dark:bg-[#161b22] rounded-2xl p-6 shadow-sm border border-outline-variant/10 dark:border-gray-800 dark:border-gray-700 dark:border-gray-700">
+                <div class="flex items-center gap-2 mb-4">
+                    <span class="material-symbols-outlined text-primary dark:text-primary-fixed-dim text-sm" data-icon="groups">groups</span>
+                    <h3 class="font-bold text-sm">Participants</h3>
+                </div>
+                <div class="space-y-2">
+                    {% for i in event.Participants %}
+                        {% if i.Name != event.Killer.Name %}
+                        <a href="{{ url_for('player', player_id=i.Id) }}" class="flex items-center justify-between p-3 rounded-xl hover:bg-surface-container-low dark:hover:bg-surface-container-low/10 transition-colors group">
+                            <div class="min-w-0">
+                                <div class="font-semibold text-on-surface dark:text-gray-200 text-sm group-hover:text-primary dark:text-primary-fixed-dim transition-colors truncate">{{ i.Name }}</div>
+                                <div class="text-xs text-on-surface-variant/50 dark:text-gray-500 truncate">{{ i.GuildName }}</div>
                             </div>
+                            <div class="flex gap-3 text-xs flex-shrink-0 ml-2">
+                                {% if i.DamageDone != 0 %}
+                                <span class="text-tertiary dark:text-tertiary-fixed-dim font-semibold">⚔️ {{ "{:,}".format(i.DamageDone) }}</span>
+                                {% endif %}
+                                {% if i.SupportHealingDone != 0 %}
+                                <span class="text-green-600 font-semibold">🍃 {{ "{:,}".format(i.SupportHealingDone) }}</span>
+                                {% endif %}
+                            </div>
+                        </a>
                         {% endif %}
                     {% endfor %}
                 </div>
             </div>
         </div>
+
+        <!-- VICTIM COLUMN -->
+        <div class="space-y-6">
+            <div class="bg-surface-container-lowest dark:bg-[#161b22] rounded-2xl p-6 shadow-sm border border-outline-variant/10 dark:border-gray-800 dark:border-gray-700 dark:border-gray-700">
+                <!-- Victim Header -->
+                <div class="flex items-center justify-between mb-4">
+                    <div>
+                        <div class="text-xs uppercase tracking-[0.1em] text-on-surface-variant/50 dark:text-gray-500 font-bold mb-1">Victim</div>
+                        <a href="{{ url_for('player', player_id=event.Victim.Id) }}" class="text-xl font-extrabold text-tertiary dark:text-tertiary-fixed-dim hover:underline">{{ event.Victim.Name }}</a>
+                    </div>
+                    <span class="inline-flex items-center px-3 py-1.5 bg-tertiary-container text-on-tertiary-container text-xs font-bold rounded-lg">{{ "{:,}".format(event.Victim.DeathFame) }} Fame</span>
+                </div>
+                <div class="text-sm text-on-surface-variant/60 dark:text-gray-500 font-medium mb-6">
+                    <span class="material-symbols-outlined text-sm align-middle" data-icon="shield">shield</span>
+                    {{ event.Victim.GuildName }}
+                </div>
+
+                <!-- Victim Equipment Grid -->
+                <div class="flex flex-wrap justify-center gap-1.5 max-w-[220px] mx-auto">
+                    {% set v_equip = event.Victim.Equipment %}
+                    {% set v_slots = ['Bag', 'Head', 'Cape', 'MainHand', 'Armor', 'OffHand', 'Potion', 'Shoes', 'Food', 'Mount'] %}
+                    {% for slot in v_slots %}
+                    <div class="gear-slot" style="background-color: hsla(0, 80%, 43%, 0.15);">
+                        {% if v_equip[slot] and v_equip[slot].Type %}
+                        <img src="https://render.albiononline.com/v1/item/{{ v_equip[slot].Type }}.png?count=1&quality={{ v_equip[slot].Quality }}">
+                        {% if slot in ['Potion', 'Food'] and v_equip[slot].Count %}
+                        <span class="item-count">{{ v_equip[slot].Count }}</span>
+                        {% endif %}
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Victim Inventory -->
+            <div class="bg-surface-container-lowest dark:bg-[#161b22] rounded-2xl p-6 shadow-sm border border-outline-variant/10 dark:border-gray-800 dark:border-gray-700 dark:border-gray-700">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-2">
+                        <span class="material-symbols-outlined text-primary dark:text-primary-fixed-dim text-sm" data-icon="inventory_2">inventory_2</span>
+                        <h3 class="font-bold text-sm">Inventory</h3>
+                    </div>
+                    <span class="text-tertiary dark:text-tertiary-fixed-dim font-bold text-sm">Loss: {{ "{:,}".format(estimated_loss) }} 💰</span>
+                </div>
+                <div class="flex flex-wrap gap-1.5 justify-center">
+                    {% for i in event.Victim.Inventory %}
+                        {% if i %}
+                        <div class="gear-slot bg-surface-container-low border border-outline-variant/10 dark:border-gray-800 dark:border-gray-700 dark:border-gray-700" style="height: 56px; width: 56px;">
+                            <img src="https://render.albiononline.com/v1/item/{{ i.Type }}.png?count=1&quality={{ i.Quality }}" class="max-w-full max-h-full">
+                            <span class="item-count">{{ i.Count }}</span>
+                        </div>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
     </div>
-</div>
-{% endfor %}
-{% endblock %}
+    {% endfor %}
+</main>
+
+<!-- FOOTER -->
+<footer class="mt-auto py-8 text-center bg-surface-container-lowest dark:bg-[#161b22] border-t border-outline-variant/10 dark:border-gray-800" style="font-size: 0.85rem;">
+    <div class="max-w-5xl mx-auto px-4 text-on-surface-variant/80 dark:text-gray-400">
+        <p class="mb-1">Crafted with ⚔️ in the Outlands.</p>
+        <p class="mb-0 text-on-surface-variant/50 dark:text-gray-500">Not affiliated with Sandbox Interactive GmbH.</p>
+    </div>
+</footer>
+
+<script>
+    // Dark mode toggle with localStorage persistence
+    document.getElementById('themeToggle').addEventListener('click', function() {
+        const isDark = document.documentElement.classList.toggle('dark');
+        document.documentElement.classList.toggle('light', !isDark);
+        localStorage.setItem('ao-dark-mode', isDark);
+    });
+</script>
+</body>
+</html>

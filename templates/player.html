@@ -1,164 +1,294 @@
-{% extends "base.html" %}
-{% block content %}
-<div class="container mt-4">
+<!DOCTYPE html>
+<html class="light" lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>{{ player.Name }} - AO KillBoard</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "surface": "#f6faff",
+                        "surface-container-highest": "#dbe4ed",
+                        "inverse-surface": "#293138",
+                        "on-tertiary": "#ffffff",
+                        "on-primary-container": "#ffffff",
+                        "tertiary": "#b91830",
+                        "primary-fixed-dim": "#b1c5ff",
+                        "surface-container-high": "#e0e9f2",
+                        "surface-container": "#e6eff8",
+                        "on-error-container": "#93000a",
+                        "on-secondary-fixed": "#181c20",
+                        "on-background": "#141d23",
+                        "outline": "#727787",
+                        "primary": "#0057cd",
+                        "secondary": "#5b5f63",
+                        "outline-variant": "#c2c6d8",
+                        "on-primary": "#ffffff",
+                        "on-secondary": "#ffffff",
+                        "surface-container-lowest": "#ffffff",
+                        "on-surface": "#141d23",
+                        "secondary-container": "#dde0e5",
+                        "tertiary-container": "#dd3645",
+                        "on-error": "#ffffff",
+                        "error-container": "#ffdad6",
+                        "surface-variant": "#dbe4ed",
+                        "error": "#ba1a1a",
+                        "surface-container-low": "#ecf5fe",
+                        "primary-container": "#0d6efd",
+                        "on-surface-variant": "#424655",
+                        "on-tertiary-container": "#130001"
+                    },
+                    fontFamily: {
+                        "headline": ["Inter"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    },
+                    borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+                },
+            },
+        }
+    </script>
+    <!-- Restore dark mode before paint to avoid flash -->
+    <script>
+        if (localStorage.getItem('ao-dark-mode') === 'true') {
+            document.documentElement.classList.remove('light');
+            document.documentElement.classList.add('dark');
+        }
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f6faff; }
+        .dark body { background-color: #0d1117; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+    </style>
+</head>
+<body class="bg-surface dark:bg-[#0d1117] text-on-surface dark:text-gray-200 min-h-screen flex flex-col transition-colors duration-300">
+
+<!-- Top Navigation Bar -->
+<nav class="w-full sticky top-0 z-50 bg-[#ffffff]/70 dark:bg-[#0d1117]/80 backdrop-blur-md font-['Inter'] antialiased text-sm tracking-tight border-b border-outline-variant/10 dark:border-gray-800">
+    <div class="flex justify-between items-center h-16 px-8 max-w-5xl mx-auto">
+        <a href="/" class="text-xl font-bold tracking-tighter text-[#141d23] dark:text-white hover:opacity-80 transition-opacity">AO KillBoard</a>
+        <button id="themeToggle" class="p-2 rounded-xl bg-surface-container dark:bg-gray-800 text-on-surface-variant dark:text-gray-400 hover:bg-surface-container-high dark:hover:bg-gray-700 transition-colors flex items-center justify-center">
+            <span class="material-symbols-outlined dark:hidden" data-icon="dark_mode">dark_mode</span>
+            <span class="material-symbols-outlined hidden dark:block" data-icon="light_mode">light_mode</span>
+        </button>
+    </div>
+</nav>
+
+<main class="max-w-5xl mx-auto px-4 md:px-8 py-12 flex-1 w-full space-y-8">
+    
     <!-- Player Header Info -->
-    <div class="card shadow mb-4">
-        <div class="card-body text-center">
-            <!--Image -->
-            <h2 class="card-title d-flex justify-content-center align-items-center gap-2">
-                <img src="{{ url_for('static', filename='/FeelsDankMan.png') }}" 
-                     alt="icon" 
-                     style="height: 1.2em; width: auto;">
-                {{ player.Name }}
-            </h2>
+    <header class="bg-surface-container-lowest dark:bg-[#161b22] rounded-2xl p-8 shadow-sm border border-outline-variant/10 dark:border-gray-800 dark:border-gray-700 dark:border-gray-700">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div>
+                <h1 class="text-4xl font-extrabold tracking-tighter text-on-surface dark:text-gray-200 flex items-center gap-3 mb-2">
+                    <img src="{{ url_for('static', filename='FeelsDankMan.png') }}"
+                         alt="icon" class="h-10 w-auto"
+                         onerror="this.style.display='none'">
+                    {{ player.Name }}
+                </h1>
+                <div class="text-sm font-medium text-on-surface-variant/70 dark:text-gray-400 flex items-center gap-1.5">
+                    <span class="material-symbols-outlined text-sm align-middle" data-icon="shield">shield</span>
+                    Guild: <span class="text-on-surface dark:text-gray-200 font-semibold">{{ player.GuildName }}</span>
+                </div>
+            </div>
             
-            <h5 class="text-muted">Guild: {{ player.GuildName }}</h5>
-            <div class="row mt-3 justify-content-center">
-                <div class="col-md-3">
-                    <div class="p-2 border rounded bg-light">
-                        <strong>Kill Fame 😍</strong><br>
-                        {{ "{:,}".format(player.KillFame) }}
-                    </div>
+            <!-- Core PvP Stats Row -->
+            <div class="flex flex-wrap gap-4 md:gap-6">
+                <div class="flex flex-col">
+                    <span class="text-xs uppercase tracking-[0.1em] text-on-surface-variant/60 dark:text-gray-500 font-bold mb-1">Kill Fame 😍</span>
+                    <span class="text-2xl font-black text-primary dark:text-primary-fixed-dim tracking-tighter">{{ "{:,}".format(player.KillFame) }}</span>
                 </div>
-                <div class="col-md-3">
-                    <div class="p-2 border rounded bg-light">
-                        <strong>Death Fame 😭</strong><br>
-                        {{ "{:,}".format(player.DeathFame) }}
-                    </div>
+                <div class="flex flex-col">
+                    <span class="text-xs uppercase tracking-[0.1em] text-on-surface-variant/60 dark:text-gray-500 font-bold mb-1">Death Fame 😭</span>
+                    <span class="text-2xl font-black text-tertiary dark:text-tertiary-fixed-dim tracking-tighter">{{ "{:,}".format(player.DeathFame) }}</span>
                 </div>
-                <div class="col-md-3">
-                    <div class="p-2 border rounded bg-light">
-                        <strong>Fame Ratio ⚖️</strong><br>
-                        {{ "{:,}".format(player.FameRatio) }}
-                    </div>
+                <div class="flex flex-col">
+                    <span class="text-xs uppercase tracking-[0.1em] text-on-surface-variant/60 dark:text-gray-500 font-bold mb-1">Fame Ratio ⚖️</span>
+                    <span class="text-2xl font-black text-on-surface dark:text-gray-200 tracking-tighter">{{ "{:,}".format(player.FameRatio) }}</span>
                 </div>
             </div>
         </div>
-    </div>
+    </header>
 
-    <!--STATISTICS-->
+    <!-- STATISTICS -->
     {% if player.LifetimeStatistics %}
-    <div class="card shadow mb-4">
-        <div class="card-header bg-secondary text-white">
-            <h5 class="mb-0">Lifetime Statistics</h5>
+    <section class="bg-surface-container-lowest dark:bg-[#161b22] rounded-2xl p-6 shadow-sm border border-outline-variant/10 dark:border-gray-800 dark:border-gray-700 dark:border-gray-700">
+        <div class="flex items-center gap-2 mb-6 border-b border-outline-variant/10 dark:border-gray-800 dark:border-gray-700 dark:border-gray-700 pb-4">
+            <span class="material-symbols-outlined text-on-surface-variant dark:text-gray-400" data-icon="analytics">analytics</span>
+            <h2 class="text-xl font-bold tracking-tight">Lifetime Statistics</h2>
         </div>
-        <div class="card-body">
-            <div class="row">
-                <!-- PvE Column -->
-                <div class="col-md-4 mb-3">
-                    <h6 class="text-primary border-bottom pb-2">⚔️ PvE Fame</h6>
-                    <ul class="list-group list-group-flush small">
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            Total <span class="badge bg-primary rounded-pill">{{ "{:,}".format(player.LifetimeStatistics.PvE.Total) }}</span>
-                        </li>
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            Royal <span class="text-muted">{{ "{:,}".format(player.LifetimeStatistics.PvE.Royal) }}</span>
-                        </li>
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            Outlands <span class="text-muted">{{ "{:,}".format(player.LifetimeStatistics.PvE.Outlands) }}</span>
-                        </li>
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            Avalon <span class="text-muted">{{ "{:,}".format(player.LifetimeStatistics.PvE.Avalon) }}</span>
-                        </li>
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            Hellgate <span class="text-muted">{{ "{:,}".format(player.LifetimeStatistics.PvE.Hellgate) }}</span>
-                        </li>
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            Mists <span class="text-muted">{{ "{:,}".format(player.LifetimeStatistics.PvE.Mists) }}</span>
-                        </li>
-                    </ul>
-                </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <!-- PvE Column -->
+            <div>
+                <h3 class="font-bold text-sm uppercase tracking-widest text-primary dark:text-primary-fixed-dim mb-4 flex items-center justify-between border-b border-outline-variant/10 dark:border-gray-800 dark:border-gray-700 dark:border-gray-700 pb-2">
+                    <span>⚔️ PvE Fame</span>
+                    <span class="inline-flex items-center px-2 py-1 bg-primary text-white rounded-md text-xs">{{ "{:,}".format(player.LifetimeStatistics.PvE.Total) }}</span>
+                </h3>
+                <ul class="space-y-3 text-sm">
+                    <li class="flex justify-between items-center"><span class="text-on-surface-variant dark:text-gray-400">Royal</span> <span class="font-medium">{{ "{:,}".format(player.LifetimeStatistics.PvE.Royal) }}</span></li>
+                    <li class="flex justify-between items-center"><span class="text-on-surface-variant dark:text-gray-400">Outlands</span> <span class="font-medium">{{ "{:,}".format(player.LifetimeStatistics.PvE.Outlands) }}</span></li>
+                    <li class="flex justify-between items-center"><span class="text-on-surface-variant dark:text-gray-400">Avalon</span> <span class="font-medium">{{ "{:,}".format(player.LifetimeStatistics.PvE.Avalon) }}</span></li>
+                    <li class="flex justify-between items-center"><span class="text-on-surface-variant dark:text-gray-400">Hellgate</span> <span class="font-medium">{{ "{:,}".format(player.LifetimeStatistics.PvE.Hellgate) }}</span></li>
+                    <li class="flex justify-between items-center"><span class="text-on-surface-variant dark:text-gray-400">Mists</span> <span class="font-medium">{{ "{:,}".format(player.LifetimeStatistics.PvE.Mists) }}</span></li>
+                </ul>
+            </div>
 
-                <!-- Gathering Column -->
-                <div class="col-md-4 mb-3">
-                    <h6 class="text-success border-bottom pb-2">⛏️ Gathering Fame</h6>
-                    <ul class="list-group list-group-flush small">
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            <strong>All</strong> <span class="badge bg-success rounded-pill">{{ "{:,}".format(player.LifetimeStatistics.Gathering.All.Total) }}</span>
-                        </li>
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            Fiber <span class="text-muted">{{ "{:,}".format(player.LifetimeStatistics.Gathering.Fiber.Total) }}</span>
-                        </li>
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            Hide <span class="text-muted">{{ "{:,}".format(player.LifetimeStatistics.Gathering.Hide.Total) }}</span>
-                        </li>
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            Ore <span class="text-muted">{{ "{:,}".format(player.LifetimeStatistics.Gathering.Ore.Total) }}</span>
-                        </li>
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            Wood <span class="text-muted">{{ "{:,}".format(player.LifetimeStatistics.Gathering.Wood.Total) }}</span>
-                        </li>
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            Rock <span class="text-muted">{{ "{:,}".format(player.LifetimeStatistics.Gathering.Rock.Total) }}</span>
-                        </li>
-                    </ul>
-                </div>
+            <!-- Gathering Column -->
+            <div>
+                <h3 class="font-bold text-sm uppercase tracking-widest text-green-600 mb-4 flex items-center justify-between border-b border-outline-variant/10 dark:border-gray-800 dark:border-gray-700 dark:border-gray-700 pb-2">
+                    <span>⛏️ Gathering Fame</span>
+                    <span class="inline-flex items-center px-2 py-1 bg-green-600 text-white rounded-md text-xs">{{ "{:,}".format(player.LifetimeStatistics.Gathering.All.Total) }}</span>
+                </h3>
+                <ul class="space-y-3 text-sm">
+                    <li class="flex justify-between items-center"><span class="text-on-surface-variant dark:text-gray-400">Fiber</span> <span class="font-medium">{{ "{:,}".format(player.LifetimeStatistics.Gathering.Fiber.Total) }}</span></li>
+                    <li class="flex justify-between items-center"><span class="text-on-surface-variant dark:text-gray-400">Hide</span> <span class="font-medium">{{ "{:,}".format(player.LifetimeStatistics.Gathering.Hide.Total) }}</span></li>
+                    <li class="flex justify-between items-center"><span class="text-on-surface-variant dark:text-gray-400">Ore</span> <span class="font-medium">{{ "{:,}".format(player.LifetimeStatistics.Gathering.Ore.Total) }}</span></li>
+                    <li class="flex justify-between items-center"><span class="text-on-surface-variant dark:text-gray-400">Wood</span> <span class="font-medium">{{ "{:,}".format(player.LifetimeStatistics.Gathering.Wood.Total) }}</span></li>
+                    <li class="flex justify-between items-center"><span class="text-on-surface-variant dark:text-gray-400">Rock</span> <span class="font-medium">{{ "{:,}".format(player.LifetimeStatistics.Gathering.Rock.Total) }}</span></li>
+                </ul>
+            </div>
 
-                <!-- Other Stats Column -->
-                <div class="col-md-4 mb-3">
-                    <h6 class="text-warning border-bottom pb-2">🔨 Other Activities</h6>
-                    <ul class="list-group list-group-flush small">
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            Crafting <span class="badge bg-warning text-dark rounded-pill">{{ "{:,}".format(player.LifetimeStatistics.Crafting.Total) }}</span>
-                        </li>
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            Fishing <span class="text-muted">{{ "{:,}".format(player.LifetimeStatistics.FishingFame) }}</span>
-                        </li>
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            Farming <span class="text-muted">{{ "{:,}".format(player.LifetimeStatistics.FarmingFame) }}</span>
-                        </li>
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            Crystal League <span class="text-muted">{{ "{:,}".format(player.LifetimeStatistics.CrystalLeague) }}</span>
-                        </li>
-                    </ul>
-                </div>
+            <!-- Other Stats Column -->
+            <div>
+                <h3 class="font-bold text-sm uppercase tracking-widest text-orange-500 mb-4 flex items-center justify-between border-b border-outline-variant/10 dark:border-gray-800 dark:border-gray-700 dark:border-gray-700 pb-2">
+                    <span>🔨 Other Activities</span>
+                    <span class="inline-flex items-center px-2 py-1 bg-orange-500 text-white rounded-md text-xs">{{ "{:,}".format(player.LifetimeStatistics.Crafting.Total) }}</span>
+                </h3>
+                <ul class="space-y-3 text-sm">
+                    <li class="flex justify-between items-center"><span class="text-on-surface-variant dark:text-gray-400">Crafting</span> <span class="font-medium">{{ "{:,}".format(player.LifetimeStatistics.Crafting.Total) }}</span></li>
+                    <li class="flex justify-between items-center"><span class="text-on-surface-variant dark:text-gray-400">Fishing</span> <span class="font-medium">{{ "{:,}".format(player.LifetimeStatistics.FishingFame) }}</span></li>
+                    <li class="flex justify-between items-center"><span class="text-on-surface-variant dark:text-gray-400">Farming</span> <span class="font-medium">{{ "{:,}".format(player.LifetimeStatistics.FarmingFame) }}</span></li>
+                    <li class="flex justify-between items-center"><span class="text-on-surface-variant dark:text-gray-400">Crystal League</span> <span class="font-medium">{{ "{:,}".format(player.LifetimeStatistics.CrystalLeague) }}</span></li>
+                </ul>
             </div>
         </div>
-    </div>
+    </section>
     {% endif %}
 
-    <div class="row">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
         <!-- KILLS COLUMN (BLUE) -->
-        <div class="col-md-6 mb-4">
-            <h4 class="text-primary border-bottom pb-2">Recent Kills ({{ kills|length }})</h4>
+        <div class="space-y-4">
+            <h4 class="font-bold text-lg text-primary dark:text-primary-fixed-dim border-b border-primary/20 pb-2 flex justify-between items-center">
+                <span>Recent Kills</span>
+                <span class="text-xs bg-primary/10 text-primary dark:text-primary-fixed-dim px-2 py-1 rounded-md">{{ kills|length }}</span>
+            </h4>
+            
             {% if kills %}
-                <div class="list-group">
+                <div class="space-y-3 mt-2">
                 {% for kill in kills %}
-                    <a href="{{ url_for('events', event_id=kill.EventId) }}" class="list-group-item list-group-item-action border-primary mb-1 shadow-sm" style="border-left: 5px solid blue;">
-                        <div class="d-flex w-100 justify-content-between">
-                            <h5 class="mb-1 text-primary">Killed: {{ kill.Victim.Name }}</h5>
-                            <small>{{ kill.TimeStamp[:10] }}</small>
+                    <a href="{{ url_for('events', event_id=kill.EventId) }}" class="relative block w-full bg-surface-container-lowest border-outline-variant/20 dark:bg-[#1e293b] rounded border dark:border-slate-700/50 flex overflow-hidden group shadow-sm dark:shadow-xl hover:opacity-90 transition-opacity">
+                        <!-- Primary Blue Accent Bar -->
+                        <div aria-hidden="true" class="w-1 h-full bg-primary dark:bg-[#0D6EFD] absolute left-0 top-0"></div>
+                        <!-- Main Content Container -->
+                        <div class="flex-1 p-4 pl-6 sm:p-5 sm:pl-7">
+                            <!-- Top Row: Title and Date -->
+                            <div class="flex justify-between items-start mb-3 sm:mb-4">
+                                <h2 class="text-on-surface dark:text-white text-base sm:text-lg font-bold tracking-tight truncate pr-4 group-hover:text-primary dark:group-hover:text-blue-400 transition-colors">
+                                    Killed: <span class="text-on-surface dark:text-white">{{ kill.Victim.Name }}</span>
+                                </h2>
+                                <time class="text-on-surface-variant/60 dark:text-slate-400 text-xs sm:text-sm font-medium whitespace-nowrap" datetime="{{ kill.TimeStamp[:10] }}">
+                                    {{ kill.TimeStamp[:10] }}
+                                </time>
+                            </div>
+                            <!-- Bottom Row: Guild Info and Fame Badge -->
+                            <div class="flex justify-between items-end">
+                                <!-- Guild Information -->
+                                <div class="truncate pr-4">
+                                    <p class="text-on-surface-variant/70 dark:text-slate-400 text-xs sm:text-sm truncate">
+                                        Guild: <span class="text-on-surface dark:text-slate-300 font-medium">{{ kill.Victim.GuildName }}</span>
+                                    </p>
+                                </div>
+                                <!-- Fame Badge -->
+                                <div class="bg-surface-container dark:bg-blue-900/30 px-2 sm:px-3 py-1 sm:py-1.5 rounded-md border border-transparent dark:border-blue-500/20 whitespace-nowrap">
+                                    <span class="text-primary dark:text-[#60a5fa] text-xs sm:text-sm font-bold">
+                                        {{ "{:,}".format(kill.TotalVictimKillFame) }} Fame
+                                    </span>
+                                </div>
+                            </div>
                         </div>
-                        <p class="mb-1">Fame: {{ "{:,}".format(kill.TotalVictimKillFame) }}</p>
-                        <small class="text-muted">Guild: {{ kill.Victim.GuildName }}</small>
                     </a>
                 {% endfor %}
                 </div>
             {% else %}
-                <p class="text-muted">No recent kills found.</p>
+                <p class="text-on-surface-variant/60 dark:text-gray-500 text-sm">No recent kills found.</p>
             {% endif %}
         </div>
 
         <!-- DEATHS COLUMN (RED) -->
-        <div class="col-md-6 mb-4">
-            <h4 class="text-danger border-bottom pb-2">Recent Deaths ({{ deaths|length }})</h4>
+        <div class="space-y-4">
+            <h4 class="font-bold text-lg text-tertiary dark:text-tertiary-fixed-dim border-b border-tertiary/20 pb-2 flex justify-between items-center">
+                <span>Recent Deaths</span>
+                <span class="text-xs bg-tertiary/10 text-tertiary dark:text-tertiary-fixed-dim px-2 py-1 rounded-md">{{ deaths|length }}</span>
+            </h4>
+            
             {% if deaths %}
-                <div class="list-group">
+                <div class="space-y-3 mt-2">
                 {% for death in deaths %}
-                    <a href="{{ url_for('events', event_id=death.EventId) }}" class="list-group-item list-group-item-action border-danger mb-1 shadow-sm" style="border-left: 5px solid red;">
-                        <div class="d-flex w-100 justify-content-between">
-                            <h5 class="mb-1 text-danger">Killed by: {{ death.Killer.Name }}</h5>
-                            <small>{{ death.TimeStamp[:10] }}</small>
+                    <a href="{{ url_for('events', event_id=death.EventId) }}" class="relative block w-full bg-surface-container-lowest border-outline-variant/20 dark:bg-[#1e293b] rounded border dark:border-slate-700/50 flex overflow-hidden group shadow-sm dark:shadow-xl hover:opacity-90 transition-opacity">
+                        <!-- Tertiary Red Accent Bar -->
+                        <div aria-hidden="true" class="w-1 h-full bg-tertiary dark:bg-[#dc3545] absolute left-0 top-0"></div>
+                        <!-- Main Content Container -->
+                        <div class="flex-1 p-4 pl-6 sm:p-5 sm:pl-7">
+                            <!-- Top Row: Title and Date -->
+                            <div class="flex justify-between items-start mb-3 sm:mb-4">
+                                <h2 class="text-on-surface dark:text-white text-base sm:text-lg font-bold tracking-tight truncate pr-4 group-hover:text-tertiary dark:group-hover:text-red-400 transition-colors">
+                                    Killed by: <span class="text-on-surface dark:text-white">{{ death.Killer.Name }}</span>
+                                </h2>
+                                <time class="text-on-surface-variant/60 dark:text-slate-400 text-xs sm:text-sm font-medium whitespace-nowrap" datetime="{{ death.TimeStamp[:10] }}">
+                                    {{ death.TimeStamp[:10] }}
+                                </time>
+                            </div>
+                            <!-- Bottom Row: Guild Info and Fame Badge -->
+                            <div class="flex justify-between items-end">
+                                <!-- Guild Information -->
+                                <div class="truncate pr-4">
+                                    <p class="text-on-surface-variant/70 dark:text-slate-400 text-xs sm:text-sm truncate">
+                                        Guild: <span class="text-on-surface dark:text-slate-300 font-medium">{{ death.Killer.GuildName }}</span>
+                                    </p>
+                                </div>
+                                <!-- Participants Badge -->
+                                <div class="bg-error-container/50 dark:bg-red-900/30 px-2 sm:px-3 py-1 sm:py-1.5 rounded-md border border-transparent dark:border-red-500/20 whitespace-nowrap">
+                                    <span class="text-tertiary dark:text-red-400 text-xs sm:text-sm font-bold">
+                                        {{ death.Participants|length }} Participant{% if death.Participants|length != 1 %}s{% endif %}
+                                    </span>
+                                </div>
+                            </div>
                         </div>
-                        <p class="mb-1">Participants: {{ death.Participants|length }}</p>
-                        <small class="text-muted">Guild: {{ death.Killer.GuildName }}</small>
                     </a>
                 {% endfor %}
                 </div>
             {% else %}
-                <p class="text-muted">No recent deaths found.</p>
+                <p class="text-on-surface-variant/60 dark:text-gray-500 text-sm">No recent deaths found.</p>
             {% endif %}
         </div>
     </div>
-</div>
-{% endblock %}
+
+</main>
+
+<footer class="mt-auto py-8 text-center bg-surface-container-lowest dark:bg-[#161b22] border-t border-outline-variant/10 dark:border-gray-800" style="font-size: 0.85rem;">
+    <div class="max-w-5xl mx-auto px-4 text-on-surface-variant/80 dark:text-gray-400">
+        <p class="mb-1">Crafted with ⚔️ in the Outlands.</p>
+        <p class="mb-0 text-on-surface-variant/50 dark:text-gray-500">Not affiliated with Sandbox Interactive GmbH.</p>
+    </div>
+</footer>
+
+<script>
+    // Dark mode toggle with localStorage persistence
+    document.getElementById('themeToggle').addEventListener('click', function() {
+        const isDark = document.documentElement.classList.toggle('dark');
+        document.documentElement.classList.toggle('light', !isDark);
+        localStorage.setItem('ao-dark-mode', isDark);
+    });
+</script>
+</body>
+</html>

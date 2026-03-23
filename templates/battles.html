@@ -1,139 +1,256 @@
-
-{% extends "base.html" %}
-{% block head %}
-<style>
-    @media (max-width: 768px) {
-        .table-mobile-compact td, 
-        .table-mobile-compact th {
-            padding: 0.25rem 0.5rem; 
-            font-size: 0.85rem;      
-            white-space: nowrap;     
+<!DOCTYPE html>
+<html class="light" lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>AO KillBoard - Rankings</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "surface": "#f6faff",
+                        "surface-container-highest": "#dbe4ed",
+                        "inverse-surface": "#293138",
+                        "on-tertiary": "#ffffff",
+                        "on-primary-container": "#ffffff",
+                        "tertiary": "#b91830",
+                        "primary-fixed-dim": "#b1c5ff",
+                        "surface-container-high": "#e0e9f2",
+                        "surface-container": "#e6eff8",
+                        "on-error-container": "#93000a",
+                        "on-secondary-fixed": "#181c20",
+                        "on-background": "#141d23",
+                        "outline": "#727787",
+                        "on-tertiary-fixed": "#410008",
+                        "primary": "#0057cd",
+                        "secondary": "#5b5f63",
+                        "outline-variant": "#c2c6d8",
+                        "on-primary": "#ffffff",
+                        "on-secondary": "#ffffff",
+                        "surface-container-lowest": "#ffffff",
+                        "tertiary-fixed-dim": "#ffb3b2",
+                        "secondary-fixed-dim": "#c3c7cc",
+                        "on-surface": "#141d23",
+                        "secondary-container": "#dde0e5",
+                        "inverse-on-surface": "#e9f2fb",
+                        "tertiary-container": "#dd3645",
+                        "on-error": "#ffffff",
+                        "error-container": "#ffdad6",
+                        "on-primary-fixed": "#001946",
+                        "primary-fixed": "#dae2ff",
+                        "inverse-primary": "#b1c5ff",
+                        "surface-variant": "#dbe4ed",
+                        "surface-bright": "#f6faff",
+                        "error": "#ba1a1a",
+                        "on-secondary-fixed-variant": "#43474c",
+                        "secondary-fixed": "#e0e3e8",
+                        "on-secondary-container": "#5f6368",
+                        "surface-dim": "#d2dbe4",
+                        "on-tertiary-fixed-variant": "#92001f",
+                        "tertiary-fixed": "#ffdad9",
+                        "background": "#f6faff",
+                        "surface-tint": "#0057ce",
+                        "on-primary-fixed-variant": "#00419e",
+                        "surface-container-low": "#ecf5fe",
+                        "primary-container": "#0d6efd",
+                        "on-surface-variant": "#424655",
+                        "on-tertiary-container": "#130001"
+                    },
+                    fontFamily: {
+                        "headline": ["Inter"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    },
+                    borderRadius: { "DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem" },
+                },
+            },
         }
-        .table-responsive {
-            -webkit-overflow-scrolling: touch;
+    </script>
+    <!-- Restore dark mode before paint to avoid flash -->
+    <script>
+        if (localStorage.getItem('ao-dark-mode') === 'true') {
+            document.documentElement.classList.remove('light');
+            document.documentElement.classList.add('dark');
         }
-    }
-</style>
-{% endblock %}
+    </script>
+    <style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f6faff;
+        }
+        .dark body {
+            background-color: #0d1117;
+        }
+        .glass-header {
+            background-color: rgba(224, 233, 242, 0.7);
+            backdrop-filter: blur(8px);
+        }
+        .dark .glass-header {
+            background-color: rgba(22, 27, 34, 0.8);
+        }
+    </style>
+</head>
 
-{% block content %}
+<body class="bg-surface dark:bg-[#0d1117] text-on-surface dark:text-gray-200 antialiased min-h-screen transition-colors duration-300">
+<div class="max-w-7xl mx-auto px-4 lg:px-8 py-12 relative">
+    <!-- Theme Toggle -->
+    <div class="absolute top-6 right-8">
+        <button id="themeToggle" class="p-2 rounded-xl bg-surface-container dark:bg-gray-800 text-on-surface-variant dark:text-gray-400 hover:bg-surface-container-high dark:hover:bg-gray-700 transition-colors flex items-center justify-center">
+            <span class="material-symbols-outlined dark:hidden" data-icon="dark_mode">dark_mode</span>
+            <span class="material-symbols-outlined hidden dark:block" data-icon="light_mode">light_mode</span>
+        </button>
+    </div>
 
-<div class="container-fluid mt-3">
-    <div class="row justify-content-center">
-        <div class="col-12 col-lg-8">
-            
-            <div class="text-center mb-3">
-                <p class="h5">Last update: <span id="lastUpdateDisplay">{{ last_update }}</span></p>
-                <p class="text-muted small">
-                    Next check in: 
-                    <span id="countdownTimer" class="fw-bold text-primary">--</span> seconds
-                </p>
-            </div>
-
-            <!-- SEARCH BAR -->
-            <div class="mb-3">
-                <div class="input-group">
-                    <span class="input-group-text bg-white"><i class="text-muted">🔍🤨</i></span>
-                    <input type="text" id="battleSearch" class="form-control" placeholder="Search by Player Name, Guild Name, or Battle ID..." value="{{ search_query }}">
-                    <button class="btn btn-primary" type="button" id="btnSearch">Search</button>
+    <!-- Main Content Area -->
+    <main class="flex-1">
+        
+        <!-- Analytics Header -->
+        <div class="flex flex-col items-center text-center gap-6 mb-12">
+            <div>
+                <a href="/" class="hover:opacity-80 transition-opacity">
+                    <h1 class="text-5xl font-extrabold tracking-tight text-on-surface dark:text-white mb-6">AO KillBoard</h1>
+                </a>
+                <div class="space-y-1">
+                    <div class="flex items-center justify-center gap-2 text-on-surface-variant dark:text-gray-400 text-sm font-medium">
+                        <span class="material-symbols-outlined text-xs" data-icon="update">update</span>
+                        <span>Last updated: <span id="lastUpdateDisplay">{{ last_update }}</span></span>
+                    </div>
+                    <p class="text-xs text-on-surface-variant/70 dark:text-gray-500 font-medium">
+                        Next check in: <span id="countdownTimer" class="text-primary dark:text-blue-400 font-bold">--</span> seconds
+                    </p>
                 </div>
             </div>
+            
+            <!-- Search UI -->
+            <div class="relative w-full max-w-2xl mx-auto">
+                <span class="absolute inset-y-0 left-4 flex items-center text-on-surface-variant/40 dark:text-gray-500">
+                    <span class="material-symbols-outlined" data-icon="search">search</span>
+                </span>
+                <input id="battleSearch" class="w-full pl-12 pr-32 py-4 bg-surface-container-lowest dark:bg-[#161b22] border border-outline-variant/30 dark:border-gray-700 rounded-2xl shadow-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm outline-none dark:text-white" placeholder="Search by Player Name, Guild Name, or Battle ID..." type="text" value="{{ search_query }}" />
+                <button id="btnSearch" class="absolute right-2 top-2 bottom-2 px-6 bg-primary dark:bg-blue-600 text-white text-xs font-bold rounded-xl hover:bg-primary-container dark:hover:bg-blue-500 transition-colors">Search</button>
+            </div>
+        </div>
 
-            <div class="table-responsive shadow rounded">
-                <table id="battlesTable" class="table table-hover table-mobile-compact mb-0">
-                    <thead class="table-light">
-                        <tr>
-                            <th>#</th>
-                            <th>Battle ID</th>
-                            <th>Time</th>
-                            <th>Guilds</th>
-                            <th>Stats</th>
+        <!-- Precision Ledger Table -->
+        <div class="bg-surface-container-lowest dark:bg-[#161b22] rounded-3xl overflow-hidden shadow-sm border border-outline-variant/10 dark:border-gray-800">
+            <div class="overflow-x-auto">
+                <table id="battlesTable" class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="glass-header border-b border-outline-variant/10 dark:border-gray-800">
+                            <th class="px-8 py-5 text-xs font-bold tracking-[0.1em] text-on-surface-variant dark:text-gray-400 uppercase">#</th>
+                            <th class="px-8 py-5 text-xs font-bold tracking-[0.1em] text-on-surface-variant dark:text-gray-400 uppercase">Battle ID</th>
+                            <th class="px-8 py-5 text-xs font-bold tracking-[0.1em] text-on-surface-variant dark:text-gray-400 uppercase">Time</th>
+                            <th class="px-8 py-5 text-xs font-bold tracking-[0.1em] text-on-surface-variant dark:text-gray-400 uppercase">Guilds</th>
+                            <th class="px-8 py-5 text-xs font-bold tracking-[0.1em] text-on-surface-variant dark:text-gray-400 uppercase text-right">Total fame</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody class="divide-y divide-surface-container-low dark:divide-gray-800">
                         {% for battle in battles %}
-                            <tr>
-                                <td>{{ (page - 1) * 25 + loop.index }}</td>
-                                <td>
-                                    <a href="{{ url_for('battle_details', battle_id=battle.id) }}">
-                                        {{ battle.id }}
-                                    </a>
-                                </td>
-                                <td>
-                                    {% if battle.endTime is string %}
-                                        {{ battle.endTime.replace('T', ' ').split('.')[0] }}
-                                    {% else %}
-                                        {{ battle.endTime.strftime('%Y-%m-%d %H:%M:%S') }}
+                        <tr class="hover:bg-surface-container-low dark:hover:bg-gray-800/50 transition-colors duration-200">
+                            <td class="px-8 py-6 text-base font-medium text-on-surface-variant/60 dark:text-gray-500">{{ (page - 1) * 25 + loop.index }}</td>
+                            <td class="px-8 py-6">
+                                <a href="{{ url_for('battle_details', battle_id=battle.id) }}" class="font-mono text-sm font-semibold text-primary dark:text-blue-400 hover:underline">
+                                    {{ battle.id }}
+                                </a>
+                            </td>
+                            <td class="px-8 py-6 text-base text-on-surface-variant dark:text-gray-400">
+                                {% if battle.endTime is string %}
+                                {{ battle.endTime.replace('T', ' ').split('.')[0] }}
+                                {% else %}
+                                {{ battle.endTime.strftime('%Y-%m-%d %H:%M:%S') }}
+                                {% endif %}
+                            </td>
+                            <td class="px-8 py-6">
+                                {% set g_list = battle.guild_names if battle.guild_names else [] %}
+                                {% if not g_list and battle.guilds %}
+                                {% for g in battle.guilds.values() %}
+                                {% if g.name %}{% set _ = g_list.append(g.name) %}{% endif %}
+                                {% endfor %}
+                                {% endif %}
+
+                                <span class="text-base font-semibold text-on-surface dark:text-gray-200">
+                                    {{ g_list[:2]|join(', ') }}
+                                    {% if g_list|length > 2 %}
+                                    <span class="text-on-surface dark:text-gray-200"> +{{ g_list|length - 2 }}</span>
                                     {% endif %}
-                                </td>
-                                <td>
-                                    {% set g_list = battle.guild_names if battle.guild_names else [] %}
-                                    {% if not g_list and battle.guilds %}
-                                        {% for g in battle.guilds.values() %}
-                                            {% if g.name %}{% set _ = g_list.append(g.name) %}{% endif %}
-                                        {% endfor %}
-                                    {% endif %}
-                                    
-                                    <span class="text-dark">
-                                        {{ g_list[:2]|join(', ') }}
-                                        {% if g_list|length > 2 %}
-                                            <span class="text-muted small">+{{ g_list|length - 2 }}</span>
-                                        {% endif %}
-                                    </span>
-                                </td>
-                                <td>
-                                    <span class="text-danger fw-bold">{{ "{:,}".format(battle.totalFame) }}</span>
-                                    <small class="text-muted">({{ battle.totalPlayers - 1 }}+ players)</small>
-                                </td>
-                            </tr>
+                                </span>
+                            </td>
+                            <td class="px-8 py-6 text-right">
+                                <div class="flex flex-col items-end">
+                                    <span class="text-base font-black text-tertiary dark:text-red-400">{{ "{:,}".format(battle.totalFame) }}</span>
+                                    <span class="text-[10px] text-on-surface-variant/60 dark:text-gray-500 font-medium">({{ battle.totalPlayers - 1 }}+ players)</span>
+                                </div>
+                            </td>
+                        </tr>
                         {% else %}
-                            <tr>
-                                <td colspan="5" class="text-center py-4">
-                                    No battles found matching your criteria.
-                                </td>
-                            </tr>
+                        <tr>
+                            <td colspan="5" class="px-8 py-12 text-center text-on-surface-variant dark:text-gray-400 text-sm">
+                                No battles found matching your criteria.
+                            </td>
+                        </tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
-            
-            <!-- Pagination -->
-            <nav aria-label="Battle navigation" class="mt-3">
-                <ul class="pagination justify-content-center pagination-sm" id="paginationControls">
-                    <li class="page-item {% if page <= 1 %}disabled{% endif %}">
-                        <a class="page-link" href="{{ url_for('battles', page=page-1, search=search_query) }}" tabindex="-1">Previous</a>
-                    </li>
-                    <li class="page-item disabled">
-                        <span class="page-link text-muted">Page {{ page }} of {{ total_pages }}</span>
-                    </li>
-                    <li class="page-item {% if page >= total_pages %}disabled{% endif %}">
-                        <a class="page-link" href="{{ url_for('battles', page=page+1, search=search_query) }}">Next</a>
-                    </li>
-                </ul>
-            </nav>
-
         </div>
-    </div>
+
+        <!-- Footer Pagination -->
+        <div class="mt-8 flex items-center justify-between px-2" id="paginationWrapper">
+            <button id="prevBtn" class="px-6 py-2 border border-outline-variant/30 dark:border-gray-700 rounded-xl text-sm font-semibold text-primary dark:text-blue-400 hover:bg-surface-container-low dark:hover:bg-gray-800 transition-colors {% if page <= 1 %}opacity-50 cursor-not-allowed pointer-events-none{% endif %}">
+                Previous
+            </button>
+            
+            <div class="flex gap-2" id="paginationControls">
+                <!-- Rendered directly by JS -->
+            </div>
+            
+            <button id="nextBtn" class="px-6 py-2 border border-outline-variant/30 dark:border-gray-700 rounded-xl text-sm font-semibold text-primary dark:text-blue-400 hover:bg-surface-container-low dark:hover:bg-gray-800 transition-colors {% if page >= total_pages %}opacity-50 cursor-not-allowed pointer-events-none{% endif %}">
+                Next
+            </button>
+        </div>
+
+    </main>
 </div>
 
-{% endblock %}
+<!-- FOOTER -->
+<footer class="mt-auto py-8 text-center bg-surface-container-lowest dark:bg-[#161b22] border-t border-outline-variant/10 dark:border-gray-800" style="font-size: 0.85rem;">
+    <div class="max-w-5xl mx-auto px-4 text-on-surface-variant/80 dark:text-gray-400">
+        <p class="mb-1">Crafted with ⚔️ in the Outlands.</p>
+        <p class="mb-0 text-on-surface-variant/50 dark:text-gray-500">Not affiliated with Sandbox Interactive GmbH.</p>
+    </div>
+</footer>
 
-{% block scripts %}
+<!-- SCRIPTS -->
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script>
+    // Dark mode toggle with localStorage persistence
+    document.getElementById('themeToggle').addEventListener('click', function() {
+        const isDark = document.documentElement.classList.toggle('dark');
+        document.documentElement.classList.toggle('light', !isDark);
+        localStorage.setItem('ao-dark-mode', isDark);
+    });
+
     let targetTimestamp = Number("{{ next_update_ts | default('0') }}");
     let currentLastUpdateTime = "{{ last_update }}";
     let currentPage = Number("{{ page }}");
     let totalPages = Number("{{ total_pages }}");
     let currentSearch = "{{ search_query }}";
-    
+
     const timerDisplay = document.getElementById('countdownTimer');
     const lastUpdateDisplay = document.getElementById('lastUpdateDisplay');
-    
-    // Request Management
+
     let isFetching = false;
     let searchTimeout;
-    let currentXhr = null; // Store the active AJAX request
+    let currentXhr = null; 
 
     function startSyncTimer() {
         setInterval(() => {
@@ -142,21 +259,21 @@
 
             if (secondsRemaining > 0) {
                 timerDisplay.innerText = secondsRemaining;
-                timerDisplay.className = "fw-bold text-primary";
+                timerDisplay.parentElement.className = "text-xs text-on-surface-variant/70 dark:text-gray-500 font-medium";
             } else {
                 timerDisplay.innerText = "Updating...";
-                timerDisplay.className = "fw-bold text-warning";
+                timerDisplay.parentElement.className = "text-xs text-primary dark:text-blue-400 font-bold";
                 if (!isFetching) {
-                    if(currentPage === 1 && currentSearch === "") {
+                    if (currentPage === 1 && currentSearch === "") {
                         checkForUpdates(true);
                     } else {
-                        checkForUpdates(false); 
+                        checkForUpdates(false);
                     }
                 }
             }
         }, 1000);
     }
-    
+
     function checkForUpdates(shouldUpdateTable) {
         isFetching = true;
         if (currentXhr) {
@@ -164,11 +281,11 @@
         }
 
         const url = `/api/battles_list?page=${currentPage}&search=${encodeURIComponent(currentSearch)}`;
-        
-        currentXhr = $.getJSON(url, function(data) {
+
+        currentXhr = $.getJSON(url, function (data) {
             targetTimestamp = data.next_update_ts;
             const now = Math.floor(Date.now() / 1000);
-            
+
             if (targetTimestamp <= now) {
                 targetTimestamp = now + 10;
             }
@@ -179,11 +296,11 @@
                 lastUpdateDisplay.textContent = data.last_update;
                 currentLastUpdateTime = data.last_update;
             } else {
-                lastUpdateDisplay.textContent = data.last_update; 
+                lastUpdateDisplay.textContent = data.last_update;
             }
             isFetching = false;
             currentXhr = null;
-        }).fail(function(jqXHR) {
+        }).fail(function (jqXHR) {
             if (jqXHR.statusText !== 'abort') {
                 targetTimestamp = Math.floor(Date.now() / 1000) + 10;
             }
@@ -194,95 +311,139 @@
     function updateTable(battles) {
         var tableBody = $("#battlesTable tbody");
         tableBody.empty();
-        
+
         if (!battles || battles.length === 0) {
-            tableBody.append('<tr><td colspan="5" class="text-center py-4">No battles found matching your criteria.</td></tr>');
+            tableBody.append('<tr><td colspan="5" class="px-8 py-12 text-center text-on-surface-variant dark:text-gray-400 text-sm">No battles found matching your criteria.</td></tr>');
             return;
         }
 
-        $.each(battles, function(index, battle) {
-            var row = $("<tr>");
-            
-            // # Column
+        $.each(battles, function (index, battle) {
+            var row = $("<tr>").addClass("hover:bg-surface-container-low dark:hover:bg-gray-800/50 transition-colors duration-200");
+
+            // #
             var rowNum = ((currentPage - 1) * 25) + (index + 1);
-            row.append($("<td>").text(rowNum));
+            row.append($("<td>").addClass("px-8 py-6 text-base font-medium text-on-surface-variant/60 dark:text-gray-500").text(rowNum));
 
             // Battle ID
+            var idTd = $("<td>").addClass("px-8 py-6");
             var idLink = $("<a>")
                 .attr("href", "/battles/" + battle.id)
+                .addClass("font-mono text-sm font-semibold text-primary dark:text-blue-400 hover:underline")
                 .text(battle.id);
-            row.append($("<td>").append(idLink));
-            
+            idTd.append(idLink);
+            row.append(idTd);
+
             // Time
-            row.append($("<td>").text(battle.endTime));
+            var timeTd = $("<td>").addClass("px-8 py-6 text-base text-on-surface-variant dark:text-gray-400").text(battle.endTime);
+            row.append(timeTd);
 
             // Guilds
-            var guildCell = $("<td>");
-            var names = battle.guild_names.slice(0, 2);
-            var text = names.join(', ');
-            var extra = battle.guild_names.length - 2;
-            
-            var spanTag = $("<span>").addClass("text-dark").text(text);
-            if (extra > 0) {
-                spanTag.append(" ");
-                spanTag.append($("<span>").addClass("text-muted small").text("+" + extra));
+            var guildTd = $("<td>").addClass("px-8 py-6");
+            var spanTag = $("<span>").addClass("text-base font-semibold text-on-surface dark:text-gray-200");
+
+            if (battle.guild_names && battle.guild_names.length > 0) {
+                var names = battle.guild_names.slice(0, 2);
+                var text = names.join(', ');
+                var extra = battle.guild_names.length - 2;
+
+                spanTag.text(text);
+                if (extra > 0) {
+                    spanTag.append(" +" + extra);
+                }
+            } else {
+                spanTag.text("Unknown");
             }
-            guildCell.append(spanTag);
-            row.append(guildCell);
+            guildTd.append(spanTag);
+            row.append(guildTd);
 
             // Stats
-            var statsCell = $("<td>");
-            var fameSpan = $("<span>").addClass("text-danger fw-bold").text(Number(battle.totalFame).toLocaleString());
-            var pCount = Math.max(0, battle.totalPlayers - 1);
-            var playerSmall = $("<small>").addClass("text-muted").text(" (" + pCount + "+ players)");
-            statsCell.append(fameSpan).append(playerSmall);
-            row.append(statsCell);
+            var statsTd = $("<td>").addClass("px-8 py-6 text-right");
+            var flexDiv = $("<div>").addClass("flex flex-col items-end");
 
+            var fameSpan = $("<span>").addClass("text-base font-black text-tertiary dark:text-red-400").text(Number(battle.totalFame).toLocaleString());
+            var pCount = Math.max(0, battle.totalPlayers - 1);
+            var playerSmall = $("<span>").addClass("text-[10px] text-on-surface-variant/60 dark:text-gray-500 font-medium").text("(" + pCount + "+ players)");
+
+            flexDiv.append(fameSpan).append(playerSmall);
+            statsTd.append(flexDiv);
+
+            row.append(statsTd);
             tableBody.append(row);
         });
+    }
+
+    function goToPage(page) {
+        if (page !== currentPage && page >= 1 && page <= totalPages) {
+            currentPage = page;
+            checkForUpdates(true);
+            updateUrl();
+        }
     }
 
     function updatePagination(curr, total) {
         currentPage = curr;
         totalPages = total;
-        
+
         var nav = $("#paginationControls");
         nav.empty();
 
-        // Prev
-        var prevLi = $("<li>").addClass("page-item");
-        if (curr <= 1) prevLi.addClass("disabled");
-        var prevLink = $("<a>").addClass("page-link").text("Previous").attr("href", "#");
-        prevLink.click(function(e) {
+        let startPage = Math.max(1, curr - 2);
+        let endPage = Math.min(total, curr + 2);
+
+        if (startPage > 1) {
+            nav.append($("<span>").addClass("h-8 w-8 flex items-center justify-center rounded-lg hover:bg-surface-container-low dark:hover:bg-gray-800 dark:text-gray-400 text-xs font-medium cursor-pointer").text(1).click(() => goToPage(1)));
+            if (startPage > 2) {
+                nav.append($("<span>").addClass("h-8 w-8 flex items-center justify-center text-xs opacity-40 dark:text-gray-500").text("..."));
+            }
+        }
+
+        for (let i = startPage; i <= endPage; i++) {
+            if (i === curr) {
+                nav.append($("<span>").addClass("h-8 w-8 flex items-center justify-center rounded-lg bg-primary dark:bg-blue-600 text-white text-xs font-bold").text(i));
+            } else {
+                nav.append($("<span>").addClass("h-8 w-8 flex items-center justify-center rounded-lg hover:bg-surface-container-low dark:hover:bg-gray-800 dark:text-gray-400 text-xs font-medium cursor-pointer").text(i).click(() => goToPage(i)));
+            }
+        }
+
+        if (endPage < total) {
+            if (endPage < total - 1) {
+                nav.append($("<span>").addClass("h-8 w-8 flex items-center justify-center text-xs opacity-40 dark:text-gray-500").text("..."));
+            }
+            nav.append($("<span>").addClass("h-8 w-8 flex items-center justify-center rounded-lg hover:bg-surface-container-low dark:hover:bg-gray-800 dark:text-gray-400 text-xs font-medium cursor-pointer").text(total).click(() => goToPage(total)));
+        }
+
+        const prevBtn = $("#prevBtn");
+        const nextBtn = $("#nextBtn");
+
+        if (curr <= 1) {
+            prevBtn.addClass("opacity-50 cursor-not-allowed pointer-events-none");
+        } else {
+            prevBtn.removeClass("opacity-50 cursor-not-allowed pointer-events-none");
+        }
+        if (curr >= total) {
+            nextBtn.addClass("opacity-50 cursor-not-allowed pointer-events-none");
+        } else {
+            nextBtn.removeClass("opacity-50 cursor-not-allowed pointer-events-none");
+        }
+    }
+
+    function initPaginationEvents() {
+        $("#prevBtn").click(function (e) {
             e.preventDefault();
-            if (curr > 1) {
-                currentPage = curr - 1;
+            if (currentPage > 1) {
+                currentPage--;
                 checkForUpdates(true);
                 updateUrl();
             }
         });
-        prevLi.append(prevLink);
-        nav.append(prevLi);
-
-        // Text
-        var textLi = $("<li>").addClass("page-item disabled");
-        textLi.append($("<span>").addClass("page-link text-muted").text(`Page ${curr} of ${total}`));
-        nav.append(textLi);
-
-        // Next
-        var nextLi = $("<li>").addClass("page-item");
-        if (curr >= total) nextLi.addClass("disabled");
-        var nextLink = $("<a>").addClass("page-link").text("Next").attr("href", "#");
-        nextLink.click(function(e) {
+        $("#nextBtn").click(function (e) {
             e.preventDefault();
-            if (curr < total) {
-                currentPage = curr + 1;
+            if (currentPage < totalPages) {
+                currentPage++;
                 checkForUpdates(true);
                 updateUrl();
             }
         });
-        nextLi.append(nextLink);
-        nav.append(nextLi);
     }
 
     function updateUrl() {
@@ -296,25 +457,34 @@
         window.history.pushState({}, '', newUrl);
     }
 
-    // Search Logic
     function performSearch() {
         currentSearch = $("#battleSearch").val().trim();
-        currentPage = 1; 
+        currentPage = 1;
         checkForUpdates(true);
         updateUrl();
     }
 
-    $(document).ready(function() {
+    $(document).ready(function () {
         startSyncTimer();
-        $("#btnSearch").click(performSearch);        
-        $("#battleSearch").on('input', function(e) {
-            clearTimeout(searchTimeout);  
+        initPaginationEvents();
+        updatePagination(currentPage, totalPages); // Init pagination 
+
+        $("#btnSearch").click(performSearch);
+        $("#battleSearch").on('input', function (e) {
+            clearTimeout(searchTimeout);
             if ($(this).val().trim() === "") {
                 performSearch();
             } else {
                 searchTimeout = setTimeout(performSearch, 500);
             }
         });
+        $('#battleSearch').keypress(function (e) {
+            if (e.which == 13) {
+                e.preventDefault();
+                performSearch();
+            }
+        });
     });
 </script>
-{% endblock %}
+</body>
+</html>
