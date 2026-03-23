@@ -26,19 +26,36 @@
                         "on-secondary-fixed": "#181c20",
                         "on-background": "#141d23",
                         "outline": "#727787",
+                        "on-tertiary-fixed": "#410008",
                         "primary": "#0057cd",
                         "secondary": "#5b5f63",
                         "outline-variant": "#c2c6d8",
                         "on-primary": "#ffffff",
                         "on-secondary": "#ffffff",
                         "surface-container-lowest": "#ffffff",
+                        "tertiary-fixed-dim": "#ffb3b2",
+                        "secondary-fixed-dim": "#c3c7cc",
                         "on-surface": "#141d23",
                         "secondary-container": "#dde0e5",
+                        "inverse-on-surface": "#e9f2fb",
                         "tertiary-container": "#dd3645",
                         "on-error": "#ffffff",
                         "error-container": "#ffdad6",
+                        "on-primary-fixed": "#001946",
+                        "primary-fixed": "#dae2ff",
+                        "inverse-primary": "#b1c5ff",
                         "surface-variant": "#dbe4ed",
+                        "surface-bright": "#f6faff",
                         "error": "#ba1a1a",
+                        "on-secondary-fixed-variant": "#43474c",
+                        "secondary-fixed": "#e0e3e8",
+                        "on-secondary-container": "#5f6368",
+                        "surface-dim": "#d2dbe4",
+                        "on-tertiary-fixed-variant": "#92001f",
+                        "tertiary-fixed": "#ffdad9",
+                        "background": "#f6faff",
+                        "surface-tint": "#0057ce",
+                        "on-primary-fixed-variant": "#00419e",
                         "surface-container-low": "#ecf5fe",
                         "primary-container": "#0d6efd",
                         "on-surface-variant": "#424655",
@@ -118,7 +135,7 @@
                         <div class="text-xs uppercase tracking-[0.1em] text-on-surface-variant/50 dark:text-gray-500 font-bold mb-1">Killer</div>
                         <a href="{{ url_for('player', player_id=event.Killer.Id) }}" class="text-xl font-extrabold text-primary dark:text-primary-fixed-dim hover:underline">{{ event.Killer.Name }}</a>
                     </div>
-                    <span class="inline-flex items-center px-3 py-1.5 bg-primary text-white text-xs font-bold rounded-lg">{{ "{:,}".format(event.Killer.KillFame) }} Fame</span>
+                    <span class="inline-flex items-center px-3 py-1.5 bg-primary text-white dark:bg-primary/30 dark:text-primary-fixed-dim text-xs font-bold rounded-lg">{{ "{:,}".format(event.Killer.KillFame) }} Fame</span>
                 </div>
                 <div class="text-sm text-on-surface-variant/60 dark:text-gray-500 font-medium mb-6">
                     <span class="material-symbols-outlined text-sm align-middle" data-icon="shield">shield</span>
@@ -180,7 +197,7 @@
                         <div class="text-xs uppercase tracking-[0.1em] text-on-surface-variant/50 dark:text-gray-500 font-bold mb-1">Victim</div>
                         <a href="{{ url_for('player', player_id=event.Victim.Id) }}" class="text-xl font-extrabold text-tertiary dark:text-tertiary-fixed-dim hover:underline">{{ event.Victim.Name }}</a>
                     </div>
-                    <span class="inline-flex items-center px-3 py-1.5 bg-tertiary-container text-on-tertiary-container text-xs font-bold rounded-lg">{{ "{:,}".format(event.Victim.DeathFame) }} Fame</span>
+                    <span class="inline-flex items-center px-3 py-1.5 bg-tertiary-container text-on-tertiary-container dark:bg-tertiary/30 dark:text-tertiary-fixed-dim text-xs font-bold rounded-lg">{{ "{:,}".format(event.Victim.DeathFame) }} Fame</span>
                 </div>
                 <div class="text-sm text-on-surface-variant/60 dark:text-gray-500 font-medium mb-6">
                     <span class="material-symbols-outlined text-sm align-middle" data-icon="shield">shield</span>
@@ -216,7 +233,7 @@
                 <div class="flex flex-wrap gap-1.5 justify-center">
                     {% for i in event.Victim.Inventory %}
                         {% if i %}
-                        <div class="gear-slot bg-surface-container-low border border-outline-variant/10 dark:border-gray-800 dark:border-gray-700 dark:border-gray-700" style="height: 56px; width: 56px;">
+                        <div class="gear-slot bg-surface-container-low dark:bg-gray-800 border border-outline-variant/10 dark:border-gray-800 dark:border-gray-700 dark:border-gray-700" style="height: 56px; width: 56px;">
                             <img src="https://render.albiononline.com/v1/item/{{ i.Type }}.png?count=1&quality={{ i.Quality }}" class="max-w-full max-h-full">
                             <span class="item-count">{{ i.Count }}</span>
                         </div>

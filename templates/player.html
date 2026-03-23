@@ -26,19 +26,36 @@
                         "on-secondary-fixed": "#181c20",
                         "on-background": "#141d23",
                         "outline": "#727787",
+                        "on-tertiary-fixed": "#410008",
                         "primary": "#0057cd",
                         "secondary": "#5b5f63",
                         "outline-variant": "#c2c6d8",
                         "on-primary": "#ffffff",
                         "on-secondary": "#ffffff",
                         "surface-container-lowest": "#ffffff",
+                        "tertiary-fixed-dim": "#ffb3b2",
+                        "secondary-fixed-dim": "#c3c7cc",
                         "on-surface": "#141d23",
                         "secondary-container": "#dde0e5",
+                        "inverse-on-surface": "#e9f2fb",
                         "tertiary-container": "#dd3645",
                         "on-error": "#ffffff",
                         "error-container": "#ffdad6",
+                        "on-primary-fixed": "#001946",
+                        "primary-fixed": "#dae2ff",
+                        "inverse-primary": "#b1c5ff",
                         "surface-variant": "#dbe4ed",
+                        "surface-bright": "#f6faff",
                         "error": "#ba1a1a",
+                        "on-secondary-fixed-variant": "#43474c",
+                        "secondary-fixed": "#e0e3e8",
+                        "on-secondary-container": "#5f6368",
+                        "surface-dim": "#d2dbe4",
+                        "on-tertiary-fixed-variant": "#92001f",
+                        "tertiary-fixed": "#ffdad9",
+                        "background": "#f6faff",
+                        "surface-tint": "#0057ce",
+                        "on-primary-fixed-variant": "#00419e",
                         "surface-container-low": "#ecf5fe",
                         "primary-container": "#0d6efd",
                         "on-surface-variant": "#424655",
@@ -194,7 +211,7 @@
                             <!-- Top Row: Title and Date -->
                             <div class="flex justify-between items-start mb-3 sm:mb-4">
                                 <h2 class="text-on-surface dark:text-white text-base sm:text-lg font-bold tracking-tight truncate pr-4 group-hover:text-primary dark:group-hover:text-blue-400 transition-colors">
-                                    Killed: <span class="text-on-surface dark:text-white">{{ kill.Victim.Name }}</span>
+                                    Killed: <span>{{ kill.Victim.Name }}</span>
                                 </h2>
                                 <time class="text-on-surface-variant/60 dark:text-slate-400 text-xs sm:text-sm font-medium whitespace-nowrap" datetime="{{ kill.TimeStamp[:10] }}">
                                     {{ kill.TimeStamp[:10] }}
@@ -204,8 +221,8 @@
                             <div class="flex justify-between items-end">
                                 <!-- Guild Information -->
                                 <div class="truncate pr-4">
-                                    <p class="text-on-surface-variant/70 dark:text-slate-400 text-xs sm:text-sm truncate">
-                                        Guild: <span class="text-on-surface dark:text-slate-300 font-medium">{{ kill.Victim.GuildName }}</span>
+                                    <p class="text-on-surface-variant/70 dark:text-slate-400 group-hover:text-primary/70 dark:group-hover:text-blue-400/70 text-xs sm:text-sm truncate transition-colors">
+                                        Guild: <span class="font-medium">{{ kill.Victim.GuildName }}</span>
                                     </p>
                                 </div>
                                 <!-- Fame Badge -->
@@ -242,7 +259,7 @@
                             <!-- Top Row: Title and Date -->
                             <div class="flex justify-between items-start mb-3 sm:mb-4">
                                 <h2 class="text-on-surface dark:text-white text-base sm:text-lg font-bold tracking-tight truncate pr-4 group-hover:text-tertiary dark:group-hover:text-red-400 transition-colors">
-                                    Killed by: <span class="text-on-surface dark:text-white">{{ death.Killer.Name }}</span>
+                                    Killed by: <span>{{ death.Killer.Name }}</span>
                                 </h2>
                                 <time class="text-on-surface-variant/60 dark:text-slate-400 text-xs sm:text-sm font-medium whitespace-nowrap" datetime="{{ death.TimeStamp[:10] }}">
                                     {{ death.TimeStamp[:10] }}
@@ -252,8 +269,8 @@
                             <div class="flex justify-between items-end">
                                 <!-- Guild Information -->
                                 <div class="truncate pr-4">
-                                    <p class="text-on-surface-variant/70 dark:text-slate-400 text-xs sm:text-sm truncate">
-                                        Guild: <span class="text-on-surface dark:text-slate-300 font-medium">{{ death.Killer.GuildName }}</span>
+                                    <p class="text-on-surface-variant/70 dark:text-slate-400 group-hover:text-tertiary/70 dark:group-hover:text-red-400/70 text-xs sm:text-sm truncate transition-colors">
+                                        Guild: <span class="font-medium">{{ death.Killer.GuildName }}</span>
                                     </p>
                                 </div>
                                 <!-- Participants Badge -->

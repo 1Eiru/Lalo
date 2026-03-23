@@ -469,7 +469,7 @@
 
             currentModalEvents.forEach(function(event, index) {
                 var target = (currentModalMode === 'kills') ? event.Victim : event.Killer;
-                var badgeColor = (currentModalMode === 'kills') ? 'bg-tertiary-container text-on-tertiary-container dark:bg-tertiary/30 dark:text-tertiary-fixed-dim' : 'bg-primary text-white';
+                var badgeColor = (currentModalMode === 'kills') ? 'bg-tertiary-container text-on-tertiary-container dark:bg-tertiary/30 dark:text-tertiary-fixed-dim' : 'bg-primary text-white dark:bg-primary/30 dark:text-primary-fixed-dim';
                 var roleText = (currentModalMode === 'kills') ? 'Victim' : 'Killer';
                 var safeName = escapeHtml(target.Name);
                 var safeGuild = escapeHtml(target.GuildName);
@@ -481,7 +481,7 @@
                             <div class="font-bold text-on-surface dark:text-gray-200 truncate">${safeName}</div>
                             <div class="text-xs text-on-surface-variant/60 dark:text-gray-500 truncate">${safeGuild}</div>
                         </div>
-                        <span class="inline-flex items-center px-2 py-1 bg-surface-container rounded-lg text-xs font-bold text-on-surface dark:text-gray-200 flex-shrink-0">${Number(event.TotalVictimKillFame).toLocaleString()}</span>
+                        <span class="inline-flex items-center px-2 py-1 bg-surface-container dark:bg-gray-800 rounded-lg text-xs font-bold text-on-surface dark:text-gray-200 flex-shrink-0">${Number(event.TotalVictimKillFame).toLocaleString()}</span>
                     </a>
                 `;
             });
@@ -563,7 +563,7 @@
                 v.Inventory.forEach(function(item) {
                     if (item) {
                         html += `
-                            <div class="mini-grid-item bg-surface-container-low border border-outline-variant/10 dark:border-gray-800 dark:border-gray-700 dark:border-gray-700">
+                            <div class="mini-grid-item bg-surface-container-low dark:bg-gray-800 border border-outline-variant/10 dark:border-gray-800 dark:border-gray-700 dark:border-gray-700">
                                 <img src="https://render.albiononline.com/v1/item/${item.Type}.png?count=1&quality=${item.Quality}">
                                 <span class="mini-item-count">${item.Count}</span>
                             </div>
