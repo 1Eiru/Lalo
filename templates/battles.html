@@ -101,14 +101,8 @@
 </head>
 
 <body class="bg-surface dark:bg-[#0d1117] text-on-surface dark:text-gray-200 antialiased min-h-screen transition-colors duration-300">
+{% include 'navbar.html' %}
 <div class="max-w-7xl mx-auto px-4 lg:px-8 py-12 relative">
-    <!-- Theme Toggle -->
-    <div class="absolute top-6 right-8">
-        <button id="themeToggle" class="p-2 rounded-xl bg-surface-container dark:bg-gray-800 text-on-surface-variant dark:text-gray-400 hover:bg-surface-container-high dark:hover:bg-gray-700 transition-colors flex items-center justify-center">
-            <span class="material-symbols-outlined dark:hidden" data-icon="dark_mode">dark_mode</span>
-            <span class="material-symbols-outlined hidden dark:block" data-icon="light_mode">light_mode</span>
-        </button>
-    </div>
 
     <!-- Main Content Area -->
     <main class="flex-1">
@@ -116,9 +110,7 @@
         <!-- Analytics Header -->
         <div class="flex flex-col items-center text-center gap-6 mb-12">
             <div>
-                <a href="/" class="hover:opacity-80 transition-opacity">
-                    <h1 class="text-5xl font-extrabold tracking-tight text-on-surface dark:text-white mb-6">AO KillBoard</h1>
-                </a>
+                <h1 class="text-5xl font-extrabold tracking-tight text-on-surface dark:text-white mb-6">AO KillBoard</h1>
                 <div class="space-y-1">
                     <div class="flex items-center justify-center gap-2 text-on-surface-variant dark:text-gray-400 text-sm font-medium">
                         <span class="material-symbols-outlined text-xs" data-icon="update">update</span>
@@ -232,12 +224,6 @@
 <!-- SCRIPTS -->
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script>
-    // Dark mode toggle with localStorage persistence
-    document.getElementById('themeToggle').addEventListener('click', function() {
-        const isDark = document.documentElement.classList.toggle('dark');
-        document.documentElement.classList.toggle('light', !isDark);
-        localStorage.setItem('ao-dark-mode', isDark);
-    });
 
     let targetTimestamp = Number("{{ next_update_ts | default('0') }}");
     let currentLastUpdateTime = "{{ last_update }}";

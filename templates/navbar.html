@@ -1,0 +1,124 @@
+<!-- Unified Navigation Bar -->
+<nav class="w-full sticky top-0 z-50 bg-[#ffffff]/70 dark:bg-[#0d1117]/80 backdrop-blur-md font-['Inter'] antialiased text-sm tracking-tight border-b border-outline-variant/10 dark:border-gray-800">
+    <div class="flex justify-between items-center h-16 px-4 md:px-8 max-w-5xl mx-auto gap-4">
+        <!-- Left Part -->
+        <div class="flex items-center">
+            <a href="/" class="flex items-center gap-2 text-xl font-bold tracking-tighter text-[#141d23] dark:text-white hover:opacity-80 transition-opacity">
+                <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;">swords</span>
+                {% if request.path != '/battles' and request.path != '/' and request.path != '/home' %}
+                <span class="hidden sm:inline">AO KillBoard</span>
+                {% endif %}
+            </a>
+        </div>
+
+        <!-- Center Part: Search -->
+        <div class="flex-1 max-w-md relative group">
+            <div class="relative">
+                <span class="absolute inset-y-0 left-3 flex items-center text-on-surface-variant/40 dark:text-gray-500">
+                    <span class="material-symbols-outlined text-[18px]" data-icon="search">search</span>
+                </span>
+                <input type="text" id="navPlayerSearch" 
+                    class="w-full pl-10 pr-4 py-2 bg-surface-container-low dark:bg-gray-800/50 border border-outline-variant/10 dark:border-gray-700/50 rounded-xl text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all dark:text-white" 
+                    placeholder="Search player..." autocomplete="off">
+            </div>
+            <!-- Search Results Dropdown -->
+            <div id="navSearchResults" class="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-[#161b22] border border-outline-variant/20 dark:border-gray-700 rounded-2xl shadow-2xl z-[100] max-h-[400px] overflow-y-auto hidden divide-y divide-outline-variant/5 dark:divide-gray-800"></div>
+        </div>
+
+        <!-- Right Part: Actions -->
+        <div class="flex items-center gap-2">
+            <button id="themeToggle" class="p-2.5 rounded-xl bg-surface-container-low dark:bg-gray-800/50 text-on-surface-variant dark:text-gray-400 hover:bg-surface-container-high dark:hover:bg-gray-700 transition-colors flex items-center justify-center border border-outline-variant/10 dark:border-gray-700/50">
+                <span class="material-symbols-outlined dark:hidden" data-icon="dark_mode">dark_mode</span>
+                <span class="material-symbols-outlined hidden dark:block" data-icon="light_mode">light_mode</span>
+            </button>
+        </div>
+    </div>
+</nav>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 1. Theme Toggle Logic
+    const themeBtn = document.getElementById('themeToggle');
+    if (themeBtn) {
+        themeBtn.addEventListener('click', function() {
+            const isDark = document.documentElement.classList.toggle('dark');
+            document.documentElement.classList.toggle('light', !isDark);
+            localStorage.setItem('ao-dark-mode', isDark);
+        });
+    }
+
+    // 2. Search Logic
+    const searchInput = document.getElementById('navPlayerSearch');
+    const resultsBox = document.getElementById('navSearchResults');
+    let debounceTimer;
+
+    if (searchInput && resultsBox) {
+        searchInput.addEventListener('input', function(e) {
+            const query = e.target.value.trim();
+            clearTimeout(debounceTimer);
+            
+            if (query.length < 2) {
+                resultsBox.style.display = 'none';
+                resultsBox.innerHTML = '';
+                return;
+            }
+
+            debounceTimer = setTimeout(() => {
+                fetch(`/api/search?q=${encodeURIComponent(query)}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        resultsBox.innerHTML = '';
+                        if (data.players && data.players.length > 0) {
+                            data.players.forEach(player => {
+                                const kFame = Number(player.KillFame).toLocaleString();
+                                const guild = player.GuildName ? `• ${player.GuildName}` : '';
+                                
+                                const item = document.createElement('a');
+                                item.href = `/player/${player.Id}`;
+                                item.className = 'flex items-center gap-3 p-4 hover:bg-surface-container-low dark:hover:bg-gray-800/50 transition-colors group';
+                                item.innerHTML = `
+                                    <div class="w-10 h-10 rounded-full bg-primary/10 dark:bg-blue-900/20 flex items-center justify-center text-primary dark:text-blue-400 font-bold text-lg">
+                                        ${player.Name.charAt(0).toUpperCase()}
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <div class="flex items-center gap-2">
+                                            <span class="font-bold text-on-surface dark:text-gray-200 truncate">${player.Name}</span>
+                                            <span class="text-[10px] text-on-surface-variant/40 dark:text-gray-500 font-medium whitespace-nowrap">${guild}</span>
+                                        </div>
+                                        <div class="flex items-center gap-1.5 mt-0.5">
+                                            <span class="material-symbols-outlined text-[14px] text-tertiary dark:text-red-400" style="font-variation-settings: 'FILL' 1;">swords</span>
+                                            <span class="text-xs font-bold text-on-surface-variant dark:text-gray-400">${kFame}</span>
+                                        </div>
+                                    </div>
+                                    <span class="material-symbols-outlined text-on-surface-variant/20 group-hover:text-primary transition-colors" data-icon="chevron_right">chevron_right</span>
+                                `;
+                                resultsBox.appendChild(item);
+                            });
+                            resultsBox.style.display = 'block';
+                        } else {
+                            resultsBox.innerHTML = '<div class="p-8 text-center text-on-surface-variant/50 dark:text-gray-500 text-sm">No players found</div>';
+                            resultsBox.style.display = 'block';
+                        }
+                    })
+                    .catch(err => {
+                        console.error('Search error:', err);
+                    });
+            }, 300);
+        });
+
+        // Hide results on click outside
+        document.addEventListener('click', function(e) {
+            if (!searchInput.contains(e.target) && !resultsBox.contains(e.target)) {
+                resultsBox.style.display = 'none';
+            }
+        });
+
+        // Show results on focus if not empty
+        searchInput.addEventListener('focus', function() {
+            if (searchInput.value.trim().length >= 2 && resultsBox.childElementCount > 0) {
+                resultsBox.style.display = 'block';
+            }
+        });
+    }
+});
+</script>

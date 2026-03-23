@@ -111,16 +111,7 @@
 </head>
 <body class="bg-surface dark:bg-[#0d1117] text-on-surface dark:text-gray-200 min-h-screen transition-colors duration-300">
 
-<!-- Top Navigation Bar -->
-<nav class="w-full sticky top-0 z-50 bg-[#ffffff]/70 dark:bg-[#0d1117]/80 backdrop-blur-md font-['Inter'] antialiased text-sm tracking-tight border-b border-outline-variant/10 dark:border-gray-800">
-    <div class="flex justify-between items-center h-16 px-8 max-w-5xl mx-auto">
-        <a href="/" class="text-xl font-bold tracking-tighter text-[#141d23] dark:text-white hover:opacity-80 transition-opacity">AO KillBoard</a>
-        <button id="themeToggle" class="p-2 rounded-xl bg-surface-container dark:bg-gray-800 text-on-surface-variant dark:text-gray-400 hover:bg-surface-container-high dark:hover:bg-gray-700 transition-colors flex items-center justify-center">
-            <span class="material-symbols-outlined dark:hidden" data-icon="dark_mode">dark_mode</span>
-            <span class="material-symbols-outlined hidden dark:block" data-icon="light_mode">light_mode</span>
-        </button>
-    </div>
-</nav>
+{% include 'navbar.html' %}
 
 <main class="max-w-5xl mx-auto px-4 md:px-8 py-12">
     {% for event in events %}
@@ -255,13 +246,5 @@
     </div>
 </footer>
 
-<script>
-    // Dark mode toggle with localStorage persistence
-    document.getElementById('themeToggle').addEventListener('click', function() {
-        const isDark = document.documentElement.classList.toggle('dark');
-        document.documentElement.classList.toggle('light', !isDark);
-        localStorage.setItem('ao-dark-mode', isDark);
-    });
-</script>
 </body>
 </html>
