@@ -217,25 +217,11 @@
                         <th class="px-6 py-4 text-xs font-bold uppercase tracking-widest text-right">Total Fame</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-surface-variant/20 dark:divide-gray-800">
-                    {% for ally in alliances %}
-                    <tr class="hover:bg-surface-container-low dark:hover:bg-surface-container-low/10 transition-colors group">
-                        <td class="px-6 py-6 font-bold text-primary dark:text-primary-fixed-dim">
-                            {% if ally.name %}{{ ally.name }}{% else %}<span class="text-on-surface-variant/50 dark:text-gray-500 italic">No Alliance</span>{% endif %}
-                        </td>
-                        <td class="px-6 py-6 text-right font-medium">{{ ally.playerCount if ally.playerCount else 0 }}</td>
-                        <td class="px-6 py-6 text-right font-medium text-tertiary dark:text-tertiary-fixed-dim">{{ ally.kills }}</td>
-                        <td class="px-6 py-6 text-right font-medium">{{ ally.deaths }}</td>
-                        <td class="px-6 py-6 text-right font-bold text-on-surface dark:text-gray-200">{{ "{:,}".format(ally.killFame) }}</td>
-                    </tr>
-                    {% else %}
-                    <tr>
-                        <td colspan="5" class="px-6 py-8 text-center text-on-surface-variant/50 dark:text-gray-500 text-sm">No alliance data available.</td>
-                    </tr>
-                    {% endfor %}
+                <tbody id="alliancesTableBody" class="divide-y divide-surface-variant/20 dark:divide-gray-800">
                 </tbody>
             </table>
         </div>
+        <div class="flex justify-center gap-2 mt-4" id="alliancesPagination"></div>
     </section>
 
     <!-- Table Section: Guilds -->
@@ -348,6 +334,9 @@
 <script id="guild-data-json" type="application/json">
     {{ guilds | tojson | safe }}
 </script>
+<script id="alliance-data-json" type="application/json">
+    {{ alliances | tojson | safe }}
+</script>
 
 <script>
     function escapeHtml(text) {
@@ -379,6 +368,7 @@
     try {
         battleData = JSON.parse(document.getElementById('battle-data-json').textContent);
         guildData = JSON.parse(document.getElementById('guild-data-json').textContent);
+        allianceData = JSON.parse(document.getElementById('alliance-data-json').textContent);
     } catch (e) {
         console.error("Failed to parse JSON data", e);
     }
@@ -395,6 +385,10 @@
     const guildPageSize = 10;
     let currentGuildSort = 'killFame';
     let currentGuildOrder = 'desc';
+    
+    // --- ALLIANCE STATE ---
+    let currentAlliancePage = 1;
+    const alliancePageSize = 10;
 
     $(document).ready(function() {
         // --- INITIALIZE PLAYERS ---
@@ -415,6 +409,10 @@
 
         // --- INITIALIZE GUILDS ---
         sortAndRenderGuilds();
+
+        // --- INITIALIZE ALLIANCES ---
+        renderAllianceTable();
+        renderAlliancePagination();
 
         // --- MODAL LOGIC ---
         var currentModalEvents = [];
@@ -820,6 +818,67 @@
         currentGuildPage = newPage;
         renderGuildTable();
         renderGuildPagination();
+    }
+
+    // ==========================================
+    // ALLIANCE LOGIC
+    // ==========================================
+
+    function renderAllianceTable() {
+        var tbody = $('#alliancesTableBody');
+        tbody.empty();
+
+        var start = (currentAlliancePage - 1) * alliancePageSize;
+        var end = start + alliancePageSize;
+        var pageData = allianceData.slice(start, end);
+
+        if (pageData.length === 0) {
+            tbody.append('<tr><td colspan="5" class="px-6 py-8 text-center text-on-surface-variant/50 dark:text-gray-500 text-sm">No alliance data available.</td></tr>');
+            return;
+        }
+
+        pageData.forEach(ally => {
+            var safeName = ally.name ? escapeHtml(ally.name) : '<span class="text-on-surface-variant/50 dark:text-gray-500 italic">No Alliance</span>';
+            var pCount = ally.playerCount || 0;
+            var kills = ally.kills || 0;
+            var deaths = ally.deaths || 0;
+            var killFame = Number(ally.killFame || 0).toLocaleString();
+
+            var row = `
+                <tr class="hover:bg-surface-container-low dark:hover:bg-surface-container-low/10 transition-colors group">
+                    <td class="px-6 py-6 font-bold text-primary dark:text-primary-fixed-dim">${safeName}</td>
+                    <td class="px-6 py-6 text-right font-medium">${pCount}</td>
+                    <td class="px-6 py-6 text-right font-medium text-tertiary dark:text-tertiary-fixed-dim">${kills}</td>
+                    <td class="px-6 py-6 text-right font-medium">${deaths}</td>
+                    <td class="px-6 py-6 text-right font-bold text-on-surface dark:text-gray-200">${killFame}</td>
+                </tr>
+            `;
+            tbody.append(row);
+        });
+    }
+
+    function renderAlliancePagination() {
+        var totalPages = Math.ceil(allianceData.length / alliancePageSize);
+        var nav = $('#alliancesPagination');
+        nav.empty();
+
+        if (totalPages <= 1) return;
+
+        var prevClass = (currentAlliancePage <= 1) ? 'opacity-50 cursor-not-allowed pointer-events-none' : 'cursor-pointer hover:bg-surface-container-low dark:hover:bg-surface-container-low/10';
+        nav.append(`<span class="h-8 px-3 flex items-center justify-center rounded-lg border border-outline-variant/20 dark:border-gray-700 dark:border-gray-700 text-xs font-semibold text-primary dark:text-primary-fixed-dim ${prevClass}" onclick="changeAlliancePage(${currentAlliancePage - 1})">Prev</span>`);
+
+        nav.append(`<span class="h-8 px-3 flex items-center justify-center text-xs text-on-surface-variant/60 dark:text-gray-500">${currentAlliancePage}/${totalPages}</span>`);
+
+        var nextClass = (currentAlliancePage >= totalPages) ? 'opacity-50 cursor-not-allowed pointer-events-none' : 'cursor-pointer hover:bg-surface-container-low dark:hover:bg-surface-container-low/10';
+        nav.append(`<span class="h-8 px-3 flex items-center justify-center rounded-lg border border-outline-variant/20 dark:border-gray-700 dark:border-gray-700 text-xs font-semibold text-primary dark:text-primary-fixed-dim ${nextClass}" onclick="changeAlliancePage(${currentAlliancePage + 1})">Next</span>`);
+    }
+
+    window.changeAlliancePage = function(newPage) {
+        var totalPages = Math.ceil(allianceData.length / alliancePageSize);
+        if (newPage < 1 || newPage > totalPages) return;
+        currentAlliancePage = newPage;
+        renderAllianceTable();
+        renderAlliancePagination();
     }
 </script>
 </body>
