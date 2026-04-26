@@ -52,6 +52,65 @@ def log(message):
     now = datetime.now().strftime('%H:%M:%S')
     print(f"[{now}] {message}")
 
+def minify_event(event):
+    def clean_item(item):
+        if not item: return None
+        return {
+            'Type': item.get('Type'),
+            'Count': item.get('Count', 1),
+            'Quality': item.get('Quality', 1)
+        }
+
+    def clean_equipment(equip):
+        if not equip: return None
+        cleaned = {}
+        for slot, item in equip.items():
+            if item:
+                cleaned[slot] = clean_item(item)
+            else:
+                cleaned[slot] = None
+        return cleaned
+
+    def clean_inventory(inv):
+        if not inv: return []
+        return [clean_item(i) for i in inv if i]
+
+    def clean_participant(p):
+        return {
+            'Id': p.get('Id'),
+            'Name': p.get('Name', 'Unknown')
+        }
+
+    k = event.get('Killer', {})
+    v = event.get('Victim', {})
+    parts = event.get('Participants', [])
+
+    try:
+        created_at = datetime.fromisoformat(event.get('TimeStamp', '').replace('Z', '+00:00'))
+    except:
+        created_at = datetime.now(timezone.utc)
+
+    return {
+        'EventId': event.get('EventId'),
+        'TimeStamp': event.get('TimeStamp'),
+        'CreatedAt': created_at,
+        'TotalVictimKillFame': event.get('TotalVictimKillFame', 0),
+        'Killer': {
+            'Id': k.get('Id'),
+            'Name': k.get('Name', 'Unknown'),
+            'GuildName': k.get('GuildName', ''),
+            'Equipment': clean_equipment(k.get('Equipment'))
+        },
+        'Victim': {
+            'Id': v.get('Id'),
+            'Name': v.get('Name', 'Unknown'),
+            'GuildName': v.get('GuildName', ''),
+            'Equipment': clean_equipment(v.get('Equipment')),
+            'Inventory': clean_inventory(v.get('Inventory'))
+        },
+        'Participants': [clean_participant(p) for p in parts]
+    }
+
 # --- BOT CLASS ---
 class KillboardBot(commands.Bot):
     def __init__(self):
@@ -122,13 +181,9 @@ class KillboardBot(commands.Bot):
                                     if not events_collection.find_one({'EventId': eid}, {'_id': 1}):
                                         log(f"   -> Found NEW Tracked Event! ID: {eid} ({k_name} vs {v_name})")
                                         
-                                        try:
-                                            event['CreatedAt'] = datetime.fromisoformat(event['TimeStamp'].replace('Z', '+00:00'))
-                                        except:
-                                            event['CreatedAt'] = datetime.now(timezone.utc)
-                                        
-                                        event['processed'] = False
-                                        events_to_save.append(event)
+                                        minified_event = minify_event(event)
+                                        minified_event['processed'] = False
+                                        events_to_save.append(minified_event)
 
                             if events_to_save:
                                 events_to_save.sort(key=lambda x: x['EventId'])
@@ -234,18 +289,15 @@ async def event(ctx, event_id: int):
                     return               
                 event_data = await resp.json()
 
-                try:
-                    event_data['CreatedAt'] = datetime.fromisoformat(event_data['TimeStamp'].replace('Z', '+00:00'))
-                except:
-                    event_data['CreatedAt'] = datetime.now(timezone.utc)
+                minified_event = minify_event(event_data)
 
-                est_value = await get_estimated_value(session, event_data['Victim'])
-                event_data['EstimatedVictimLootValue'] = est_value
+                est_value = await get_estimated_value(session, minified_event['Victim'])
+                minified_event['EstimatedVictimLootValue'] = est_value
                 
-                img_bytes = await generate_versus_image(session, event_data)
+                img_bytes = await generate_versus_image(session, minified_event)
                 
                 file = discord.File(img_bytes, filename="killboard.png")
-                embed = create_embed(event_data, est_value)
+                embed = create_embed(minified_event, est_value)
                 await ctx.send(embed=embed, file=file)
                 
         except Exception as e:
