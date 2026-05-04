@@ -135,33 +135,33 @@
         <!-- Precision Ledger Table -->
         <div class="bg-surface-container-lowest dark:bg-[#161b22] rounded-3xl overflow-hidden shadow-sm border border-outline-variant/10 dark:border-gray-800">
             <div class="overflow-x-auto">
-                <table id="battlesTable" class="w-full text-left border-collapse">
+                <table id="battlesTable" class="w-full text-left border-collapse" style="min-width: 800px;">
                     <thead>
                         <tr class="glass-header border-b border-outline-variant/10 dark:border-gray-800">
-                            <th class="px-8 py-5 text-xs font-bold tracking-[0.1em] text-on-surface-variant dark:text-gray-400 uppercase">#</th>
-                            <th class="px-8 py-5 text-xs font-bold tracking-[0.1em] text-on-surface-variant dark:text-gray-400 uppercase">Battle ID</th>
-                            <th class="px-8 py-5 text-xs font-bold tracking-[0.1em] text-on-surface-variant dark:text-gray-400 uppercase">Time</th>
-                            <th class="px-8 py-5 text-xs font-bold tracking-[0.1em] text-on-surface-variant dark:text-gray-400 uppercase">Guilds</th>
-                            <th class="px-8 py-5 text-xs font-bold tracking-[0.1em] text-on-surface-variant dark:text-gray-400 uppercase text-right">Total fame</th>
+                            <th class="px-6 py-5 text-xs font-bold tracking-[0.1em] text-on-surface-variant dark:text-gray-400 uppercase whitespace-nowrap" style="width: 60px;">#</th>
+                            <th class="px-6 py-5 text-xs font-bold tracking-[0.1em] text-on-surface-variant dark:text-gray-400 uppercase whitespace-nowrap" style="width: 120px;">Battle ID</th>
+                            <th class="px-6 py-5 text-xs font-bold tracking-[0.1em] text-on-surface-variant dark:text-gray-400 uppercase whitespace-nowrap" style="width: 180px;">Time</th>
+                            <th class="px-6 py-5 text-xs font-bold tracking-[0.1em] text-on-surface-variant dark:text-gray-400 uppercase">Guilds</th>
+                            <th class="px-6 py-5 text-xs font-bold tracking-[0.1em] text-on-surface-variant dark:text-gray-400 uppercase text-right whitespace-nowrap" style="width: 160px;">Total fame</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-surface-container-low dark:divide-gray-800">
                         {% for battle in battles %}
                         <tr class="hover:bg-surface-container-low dark:hover:bg-gray-800/50 transition-colors duration-200">
-                            <td class="px-8 py-6 text-base font-medium text-on-surface-variant/60 dark:text-gray-500">{{ (page - 1) * 25 + loop.index }}</td>
-                            <td class="px-8 py-6">
+                            <td class="px-6 py-6 text-base font-medium text-on-surface-variant/60 dark:text-gray-500 whitespace-nowrap">{{ (page - 1) * 25 + loop.index }}</td>
+                            <td class="px-6 py-6 whitespace-nowrap">
                                 <a href="{{ url_for('battle_details', battle_id=battle.id) }}" class="font-mono text-sm font-semibold text-primary dark:text-blue-400 hover:underline">
                                     {{ battle.id }}
                                 </a>
                             </td>
-                            <td class="px-8 py-6 text-base text-on-surface-variant dark:text-gray-400">
+                            <td class="px-6 py-6 text-base text-on-surface-variant dark:text-gray-400 whitespace-nowrap">
                                 {% if battle.endTime is string %}
                                 {{ battle.endTime.replace('T', ' ').split('.')[0] }}
                                 {% else %}
                                 {{ battle.endTime.strftime('%Y-%m-%d %H:%M:%S') }}
                                 {% endif %}
                             </td>
-                            <td class="px-8 py-6">
+                            <td class="px-6 py-6">
                                 {% set g_list = battle.guild_names if battle.guild_names else [] %}
                                 {% if not g_list and battle.guilds %}
                                 {% for g in battle.guilds.values() %}
@@ -176,7 +176,7 @@
                                     {% endif %}
                                 </span>
                             </td>
-                            <td class="px-8 py-6 text-right">
+                            <td class="px-6 py-6 text-right whitespace-nowrap">
                                 <div class="flex flex-col items-end">
                                     <span class="text-base font-black text-tertiary dark:text-red-400">{{ "{:,}".format(battle.totalFame) }}</span>
                                     <span class="text-[10px] text-on-surface-variant/60 dark:text-gray-500 font-medium">({{ battle.totalPlayers - 1 }}+ players)</span>
@@ -308,10 +308,10 @@
 
             // #
             var rowNum = ((currentPage - 1) * 25) + (index + 1);
-            row.append($("<td>").addClass("px-8 py-6 text-base font-medium text-on-surface-variant/60 dark:text-gray-500").text(rowNum));
+            row.append($("<td>").addClass("px-6 py-6 text-base font-medium text-on-surface-variant/60 dark:text-gray-500 whitespace-nowrap").text(rowNum));
 
             // Battle ID
-            var idTd = $("<td>").addClass("px-8 py-6");
+            var idTd = $("<td>").addClass("px-6 py-6 whitespace-nowrap");
             var idLink = $("<a>")
                 .attr("href", "/battles/" + battle.id)
                 .addClass("font-mono text-sm font-semibold text-primary dark:text-blue-400 hover:underline")
@@ -320,11 +320,11 @@
             row.append(idTd);
 
             // Time
-            var timeTd = $("<td>").addClass("px-8 py-6 text-base text-on-surface-variant dark:text-gray-400").text(battle.endTime);
+            var timeTd = $("<td>").addClass("px-6 py-6 text-base text-on-surface-variant dark:text-gray-400 whitespace-nowrap").text(battle.endTime);
             row.append(timeTd);
 
             // Guilds
-            var guildTd = $("<td>").addClass("px-8 py-6");
+            var guildTd = $("<td>").addClass("px-6 py-6");
             var spanTag = $("<span>").addClass("text-base font-semibold text-on-surface dark:text-gray-200");
 
             if (battle.guild_names && battle.guild_names.length > 0) {
@@ -343,7 +343,7 @@
             row.append(guildTd);
 
             // Stats
-            var statsTd = $("<td>").addClass("px-8 py-6 text-right");
+            var statsTd = $("<td>").addClass("px-6 py-6 text-right whitespace-nowrap");
             var flexDiv = $("<div>").addClass("flex flex-col items-end");
 
             var fameSpan = $("<span>").addClass("text-base font-black text-tertiary dark:text-red-400").text(Number(battle.totalFame).toLocaleString());

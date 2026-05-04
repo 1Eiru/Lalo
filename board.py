@@ -1,4 +1,4 @@
-from flask import Flask, render_template, jsonify, request, abort
+from flask import Flask, render_template, jsonify, request, abort, Response
 import re 
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -556,11 +556,20 @@ def api_battles_list():
 
     if search_query:
         if search_query.isdigit():
-             search_filter = {'id': int(search_query)}
+             search_filter = {
+                "$or": [
+                    {'id': int(search_query)},
+                    {"player_names": {"$regex": search_query, "$options": "i"}},
+                    {"guild_names": {"$regex": search_query, "$options": "i"}}
+                ]
+            }
              mongo_query = {"$and": [base_query, search_filter]}
         else:
             search_filter = {
-                "$text": { "$search": f'"{search_query}"' } 
+                "$or": [
+                    {"player_names": {"$regex": search_query, "$options": "i"}},
+                    {"guild_names": {"$regex": search_query, "$options": "i"}}
+                ]
             }
             mongo_query = {"$and": [base_query, search_filter]}
     else:
@@ -685,6 +694,34 @@ def search_proxy():
         if response.status_code == 200: return jsonify(response.json())     
     except Exception: pass   
     return jsonify({'players': []})
+
+@app.route('/robots.txt')
+def robots_txt():
+    content = """User-agent: *
+Disallow: /api/
+Disallow: /events/
+Disallow: /battles/
+Disallow: /player/
+
+User-agent: ClaudeBot
+Disallow: /
+
+User-agent: GPTBot
+Disallow: /
+
+User-agent: ChatGPT-User
+Disallow: /
+
+User-agent: CCBot
+Disallow: /
+
+User-agent: anthropic-ai
+Disallow: /
+
+User-agent: Google-Extended
+Disallow: /
+"""
+    return Response(content, mimetype='text/plain')
 
 if __name__ == '__main__':
     app.run(threaded=True)

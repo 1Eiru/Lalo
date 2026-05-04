@@ -167,7 +167,7 @@
 
 {% include 'navbar.html' %}
 
-<main class="max-w-5xl mx-auto px-4 md:px-8 py-12 space-y-12">
+<main class="max-w-6xl mx-auto px-4 md:px-8 py-12 space-y-12">
     <!-- Hero Header Section -->
     <header class="space-y-4">
         <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
@@ -284,17 +284,17 @@
         </div>
 
         <div class="overflow-x-auto no-scrollbar bg-surface-container-lowest dark:bg-[#161b22] rounded-xl shadow-sm border border-outline-variant/5 dark:border-gray-800">
-            <table id="playersTable" class="w-full text-left border-collapse">
+            <table id="playersTable" class="w-full text-left border-collapse" style="min-width: 900px;">
                 <thead>
                     <tr class="bg-surface-container-high/50 dark:bg-gray-800 text-on-surface-variant dark:text-gray-400">
-                        <th class="px-6 py-4 text-xs font-bold uppercase tracking-widest">Name</th>
-                        <th class="px-6 py-4 text-xs font-bold uppercase tracking-widest hidden md:table-cell">Guild</th>
-                        <th class="px-6 py-4 text-xs font-bold uppercase tracking-widest text-right"><a href="#" onclick="sortData('IP'); return false;" class="sort-link">IP <span id="sortIcon-IP"></span></a></th>
-                        <th class="px-6 py-4 text-xs font-bold uppercase tracking-widest text-right"><a href="#" onclick="sortData('Damage'); return false;" class="sort-link">Damage <span id="sortIcon-Damage"></span></a></th>
-                        <th class="px-6 py-4 text-xs font-bold uppercase tracking-widest text-right"><a href="#" onclick="sortData('Healing'); return false;" class="sort-link">Heal <span id="sortIcon-Healing"></span></a></th>
-                        <th class="px-6 py-4 text-xs font-bold uppercase tracking-widest text-right"><a href="#" onclick="sortData('Kills'); return false;" class="sort-link">Kills <span id="sortIcon-Kills"></span></a></th>
-                        <th class="px-6 py-4 text-xs font-bold uppercase tracking-widest text-right"><a href="#" onclick="sortData('Deaths'); return false;" class="sort-link">Deaths <span id="sortIcon-Deaths"></span></a></th>
-                        <th class="px-6 py-4 text-xs font-bold uppercase tracking-widest text-right"><a href="#" onclick="sortData('KillFame'); return false;" class="sort-link">Fame <span id="sortIcon-KillFame">▼</span></a></th>
+                        <th class="px-4 py-4 text-xs font-bold uppercase tracking-widest whitespace-nowrap">Name</th>
+                        <th class="px-4 py-4 text-xs font-bold uppercase tracking-widest hidden md:table-cell whitespace-nowrap">Guild</th>
+                        <th class="px-4 py-4 text-xs font-bold uppercase tracking-widest text-right whitespace-nowrap"><a href="#" onclick="sortData('IP'); return false;" class="sort-link">IP <span id="sortIcon-IP"></span></a></th>
+                        <th class="px-4 py-4 text-xs font-bold uppercase tracking-widest text-right whitespace-nowrap"><a href="#" onclick="sortData('Damage'); return false;" class="sort-link">Damage <span id="sortIcon-Damage"></span></a></th>
+                        <th class="px-4 py-4 text-xs font-bold uppercase tracking-widest text-right whitespace-nowrap"><a href="#" onclick="sortData('Healing'); return false;" class="sort-link">Heal <span id="sortIcon-Healing"></span></a></th>
+                        <th class="px-4 py-4 text-xs font-bold uppercase tracking-widest text-right whitespace-nowrap"><a href="#" onclick="sortData('Kills'); return false;" class="sort-link">Kills <span id="sortIcon-Kills"></span></a></th>
+                        <th class="px-4 py-4 text-xs font-bold uppercase tracking-widest text-right whitespace-nowrap"><a href="#" onclick="sortData('Deaths'); return false;" class="sort-link">Deaths <span id="sortIcon-Deaths"></span></a></th>
+                        <th class="px-4 py-4 text-xs font-bold uppercase tracking-widest text-right whitespace-nowrap"><a href="#" onclick="sortData('KillFame'); return false;" class="sort-link">Fame <span id="sortIcon-KillFame">▼</span></a></th>
                     </tr>
                 </thead>
                 <tbody id="playersTableBody" class="divide-y divide-surface-variant/10 dark:divide-gray-800">
@@ -680,20 +680,20 @@
 
             var row = `
                 <tr class="hover:bg-surface-container-low dark:hover:bg-surface-container-low/10 transition-colors">
-                    <td class="px-6 py-5">
+                    <td class="px-4 py-5 whitespace-nowrap">
                         <a href="/player/${p.Id}" class="font-bold text-on-surface dark:text-gray-200 hover:text-primary dark:text-primary-fixed-dim transition-colors">${safeName}</a>
                         <div class="text-xs text-on-surface-variant/60 dark:text-gray-500 md:hidden">${safeGuild}</div>
                     </td>
-                    <td class="px-6 py-5 text-on-surface-variant/70 dark:text-gray-400 text-sm hidden md:table-cell">
+                    <td class="px-4 py-5 text-on-surface-variant/70 dark:text-gray-400 text-sm hidden md:table-cell">
                         ${safeGuild}
                         ${allianceHtml}
                     </td>
-                    <td class="px-6 py-5 text-right font-mono text-sm">${p.IP}</td>
-                    <td class="px-6 py-5 text-right">${damageVal}</td>
-                    <td class="px-6 py-5 text-right">${healVal}</td>
-                    <td class="px-6 py-5 text-right">${killBadge}</td>
-                    <td class="px-6 py-5 text-right">${deathBadge}</td>
-                    <td class="px-6 py-5 text-right">${fameVal}</td>
+                    <td class="px-4 py-5 text-right font-mono text-sm whitespace-nowrap">${p.IP}</td>
+                    <td class="px-4 py-5 text-right whitespace-nowrap">${damageVal}</td>
+                    <td class="px-4 py-5 text-right whitespace-nowrap">${healVal}</td>
+                    <td class="px-4 py-5 text-right whitespace-nowrap">${killBadge}</td>
+                    <td class="px-4 py-5 text-right whitespace-nowrap">${deathBadge}</td>
+                    <td class="px-4 py-5 text-right whitespace-nowrap">${fameVal}</td>
                 </tr>
             `;
             tbody.append(row);
