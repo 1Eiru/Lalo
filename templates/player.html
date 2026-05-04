@@ -219,7 +219,7 @@
                                 <!-- Fame Badge -->
                                 <div class="bg-surface-container dark:bg-blue-900/30 px-2 sm:px-3 py-1 sm:py-1.5 rounded-md border border-transparent dark:border-blue-500/20 whitespace-nowrap">
                                     <span class="text-primary dark:text-[#60a5fa] text-xs sm:text-sm font-bold">
-                                        {{ "{:,}".format(kill.TotalVictimKillFame) }} Fame
+                                        {{ "{:,}".format(kill.TotalVictimKillFame|default(0)) }} Fame
                                     </span>
                                 </div>
                             </div>
@@ -267,7 +267,7 @@
                                 <!-- Participants Badge -->
                                 <div class="bg-error-container/50 dark:bg-red-900/30 px-2 sm:px-3 py-1 sm:py-1.5 rounded-md border border-transparent dark:border-red-500/20 whitespace-nowrap">
                                     <span class="text-tertiary dark:text-red-400 text-xs sm:text-sm font-bold">
-                                        {{ death.Participants|length }} Participant{% if death.Participants|length != 1 %}s{% endif %}
+                                        {{ death.Participants|default([])|length }} Participant{% if death.Participants|default([])|length != 1 %}s{% endif %}
                                     </span>
                                 </div>
                             </div>
