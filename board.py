@@ -20,6 +20,16 @@ limiter = Limiter(
     storage_uri="memory://"
 )
 
+# Block AI crawlers/bots
+BLOCKED_BOTS = ['claudebot', 'gptbot', 'chatgpt-user', 'ccbot', 'anthropic-ai', 'google-extended', 'bytespider', 'semrushbot']
+
+@app.before_request
+def block_bots():
+    ua = request.headers.get('User-Agent', '').lower()
+    for bot in BLOCKED_BOTS:
+        if bot in ua:
+            abort(403)
+
 mongoURI = os.getenv('TEST_URI')
 client = MongoClient(mongoURI)
 db = client.flask_database
