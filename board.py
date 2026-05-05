@@ -715,6 +715,7 @@ Disallow: /player/
 
 User-agent: ClaudeBot
 Disallow: /
+Crawl-delay: 10
 
 User-agent: GPTBot
 Disallow: /
