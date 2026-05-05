@@ -664,6 +664,21 @@ def battle_details(battle_id):
     # --- Players Logic ---
     all_player_stats = get_battle_details_cached(battle_id)
     all_player_stats.sort(key=lambda x: x.get('KillFame', 0) or 0, reverse=True)
+
+    guild_ip_sums = {}
+    guild_ip_counts = {}
+    for p in all_player_stats:
+        gname = p.get('GuildName')
+        if gname:
+            guild_ip_sums[gname] = guild_ip_sums.get(gname, 0) + p.get('IP', 0)
+            guild_ip_counts[gname] = guild_ip_counts.get(gname, 0) + 1
+
+    for g in guilds_list:
+        gname = g.get('name')
+        if gname and gname in guild_ip_counts and guild_ip_counts[gname] > 0:
+            g['avgIp'] = round(guild_ip_sums[gname] / guild_ip_counts[gname])
+        else:
+            g['avgIp'] = 0
     total_players_count = len(all_player_stats)
 
     unique_guilds = sorted(list(set(p['GuildName'] for p in all_player_stats if p['GuildName'])))

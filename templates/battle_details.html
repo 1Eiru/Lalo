@@ -238,6 +238,7 @@
                         <th class="px-6 py-4 text-xs font-bold uppercase tracking-widest text-right"><a href="#" onclick="sortGuilds('playerCount'); return false;" class="sort-link">Players <span id="gSortIcon-playerCount"></span></a></th>
                         <th class="px-6 py-4 text-xs font-bold uppercase tracking-widest text-right"><a href="#" onclick="sortGuilds('kills'); return false;" class="sort-link">Kills <span id="gSortIcon-kills"></span></a></th>
                         <th class="px-6 py-4 text-xs font-bold uppercase tracking-widest text-right"><a href="#" onclick="sortGuilds('deaths'); return false;" class="sort-link">Deaths <span id="gSortIcon-deaths"></span></a></th>
+                        <th class="px-6 py-4 text-xs font-bold uppercase tracking-widest text-right"><a href="#" onclick="sortGuilds('avgIp'); return false;" class="sort-link">Avg. IP <span id="gSortIcon-avgIp"></span></a></th>
                         <th class="px-6 py-4 text-xs font-bold uppercase tracking-widest text-right"><a href="#" onclick="sortGuilds('killFame'); return false;" class="sort-link">Kill Fame <span id="gSortIcon-killFame">▼</span></a></th>
                     </tr>
                 </thead>
@@ -770,7 +771,7 @@
         var pageData = guildData.slice(start, end);
 
         if (pageData.length === 0) {
-            tbody.append('<tr><td colspan="5" class="px-6 py-8 text-center text-on-surface-variant/50 dark:text-gray-500 text-sm">No guild data available.</td></tr>');
+            tbody.append('<tr><td colspan="6" class="px-6 py-8 text-center text-on-surface-variant/50 dark:text-gray-500 text-sm">No guild data available.</td></tr>');
             return;
         }
 
@@ -783,12 +784,14 @@
             var deaths = g.deaths || 0;
             var fame = Number(g.killFame || 0).toLocaleString();
 
+            var avgIp = g.avgIp || 0;
             var row = `
                 <tr class="hover:bg-surface-container-low dark:hover:bg-surface-container-low/10 transition-colors">
                     <td class="px-6 py-6 font-bold">${safeGuildName}${allianceHtml}</td>
                     <td class="px-6 py-6 text-right font-medium">${pCount}</td>
                     <td class="px-6 py-6 text-right font-bold text-tertiary dark:text-tertiary-fixed-dim">${kills}</td>
                     <td class="px-6 py-6 text-right font-medium">${deaths}</td>
+                    <td class="px-6 py-6 text-right font-medium">${avgIp}</td>
                     <td class="px-6 py-6 text-right font-bold">${fame}</td>
                 </tr>
             `;

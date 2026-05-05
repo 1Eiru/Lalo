@@ -99,14 +99,16 @@ def minify_event(event):
             'Id': k.get('Id'),
             'Name': k.get('Name', 'Unknown'),
             'GuildName': k.get('GuildName', ''),
-            'Equipment': clean_equipment(k.get('Equipment'))
+            'Equipment': clean_equipment(k.get('Equipment')),
+            'AverageItemPower': k.get('AverageItemPower', 0)
         },
         'Victim': {
             'Id': v.get('Id'),
             'Name': v.get('Name', 'Unknown'),
             'GuildName': v.get('GuildName', ''),
             'Equipment': clean_equipment(v.get('Equipment')),
-            'Inventory': clean_inventory(v.get('Inventory'))
+            'Inventory': clean_inventory(v.get('Inventory')),
+            'AverageItemPower': v.get('AverageItemPower', 0)
         },
         'Participants': [clean_participant(p) for p in parts]
     }
@@ -430,6 +432,17 @@ async def generate_versus_image(session, doc):
             'y_offset': -19     # Move Up (-) or Down (+)
         }
     }
+
+    STATS_CONFIGS = {
+        'killer_ip': {
+            'x_offset': 0,       # Move Left (-) or Right (+) from stats_x
+            'y_offset': -45        # Move Up (-) or Down (+) from default ip_y
+        },
+        'victim_ip': {
+            'x_offset': -40,       # Move Left (-) or Right (+) from loss_x
+            'y_offset': -55        # Move Up (-) or Down (+) from default ip_y
+        }
+    }
     # ---------------------------------------
 
     killer = doc['Killer']
@@ -685,6 +698,17 @@ async def generate_versus_image(session, doc):
         canvas.paste(silver_image, (loss_x - 45, loss_y - 10), silver_image)
     
     draw.text((loss_x, loss_y), f"{est_val:,}", fill="#333333", font=SMALL_FONT)
+
+    # 7b. IP
+    killer_ip = killer.get('AverageItemPower', 0)
+    victim_ip = victim.get('AverageItemPower', 0)
+    ip_y = anatomy_y + 435
+
+    kip_cfg = STATS_CONFIGS['killer_ip']
+    vip_cfg = STATS_CONFIGS['victim_ip']
+
+    draw.text((stats_x + kip_cfg['x_offset'], ip_y + kip_cfg['y_offset']), f"IP: {int(killer_ip)}", fill="#252525", font=SMALL_FONT)
+    draw.text((loss_x + vip_cfg['x_offset'], ip_y + vip_cfg['y_offset']), f"IP: {int(victim_ip)}", fill="#333333", font=SMALL_FONT)
 
     # Separator
     line_y = anatomy_y + ANATOMY_H + 20
