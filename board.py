@@ -503,6 +503,62 @@ def calculate_estimated_loss(victim_data):
         total_est_value += (unit_price * i_count)
     return int(total_est_value)
 
+def calculate_donation_loss(victims_list):
+    items_to_fetch = set()
+    all_victim_items = []
+
+    for victim in victims_list:
+        if victim.get('Equipment'):
+            for key, item in victim['Equipment'].items():
+                if item:
+                    items_to_fetch.add(item['Type'])
+                    all_victim_items.append((item['Type'], item['Quality'], item['Count']))
+        if victim.get('Inventory'):
+            for item in victim['Inventory']:
+                if item:
+                    items_to_fetch.add(item['Type'])
+                    all_victim_items.append((item['Type'], item['Quality'], item['Count']))
+
+    if not items_to_fetch:
+        return 0
+
+    locations = "Caerleon,Bridgewatch,Martlock,Thetford,Lymhurst,Fortsterling"
+    item_str = ",".join(items_to_fetch)
+    url = f"https://east.albion-online-data.com/api/v2/stats/prices/{item_str}.json?locations={locations}&qualities=1,2,3,4,5"
+    try:
+        resp = requests.get(url, timeout=5)
+        if resp.status_code != 200:
+            return 0
+        price_data = resp.json()
+    except Exception:
+        return 0
+
+    price_map = {}
+    for entry in price_data:
+        key = (entry['item_id'], entry['quality'])
+        if key not in price_map:
+            price_map[key] = {'sells': [], 'buys': []}
+        if entry.get('sell_price_min', 0) > 0:
+            price_map[key]['sells'].append(entry['sell_price_min'])
+        if entry.get('buy_price_max', 0) > 0:
+            price_map[key]['buys'].append(entry['buy_price_max'])
+
+    total_est_value = 0
+    for i_id, i_qual, i_count in all_victim_items:
+        key = (i_id, i_qual)
+        unit_price = 0
+        if key in price_map:
+            data = price_map[key]
+            if data['sells']:
+                data['sells'].sort()
+                cutoff = max(1, len(data['sells']) // 2)
+                low_end_prices = data['sells'][:cutoff]
+                unit_price = sum(low_end_prices) / len(low_end_prices)
+            elif data['buys']:
+                unit_price = max(data['buys'])
+        total_est_value += (unit_price * i_count)
+    return int(total_est_value)
+
 # --ROUTES ---
 
 @app.route("/battles")
@@ -721,17 +777,53 @@ def battle_details(battle_id):
         if dc > top_death['deaths']:
             top_death = {'name': p.get('Name', ''), 'deaths': dc}
 
+    biggest_donation = {
+        'name': top_death['name'],
+        'deaths': top_death['deaths'],
+        'silver_lost': 0,
+        'dropped_items': []
+    }
+
+    if top_death['name']:
+        for p in all_player_stats:
+            if p.get('Name') == top_death['name']:
+                death_events = p.get('DeathEvents', [])
+                victims = [de['Victim'] for de in death_events if de.get('Victim')]
+                biggest_donation['silver_lost'] = calculate_donation_loss(victims)
+
+                all_dropped = []
+                for victim in victims:
+                    if victim.get('Equipment'):
+                        for key, item in victim['Equipment'].items():
+                            if item:
+                                all_dropped.append({
+                                    'Type': item['Type'],
+                                    'Quality': item.get('Quality', 1),
+                                    'Count': item.get('Count', 1)
+                                })
+                    if victim.get('Inventory'):
+                        for item in victim['Inventory']:
+                            if item:
+                                all_dropped.append({
+                                    'Type': item['Type'],
+                                    'Quality': item.get('Quality', 1),
+                                    'Count': item.get('Count', 1)
+                                })
+                biggest_donation['dropped_items'] = all_dropped
+                break
+
     unique_guilds = sorted(list(set(p['GuildName'] for p in all_player_stats if p['GuildName'])))
     unique_alliances = sorted(list(set(p['AllianceName'] for p in all_player_stats if p['AllianceName'])))
 
     return render_template('battle_details.html', 
                            battle=battle, 
-                           guilds=guilds_list, # Pass full list
+                           guilds=guilds_list,
                            alliances=alliances_list,                           
                            all_player_stats=all_player_stats, 
                            total_players_count=total_players_count,
                            top_killer=top_killer,
                            top_death=top_death,
+                           biggest_donation=biggest_donation,
                            unique_guilds=unique_guilds,
                            unique_alliances=unique_alliances)
 

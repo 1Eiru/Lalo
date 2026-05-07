@@ -203,9 +203,14 @@
                 <span class="text-sm text-tertiary dark:text-tertiary-fixed-dim font-semibold mt-1">{{ top_killer.kills }} kills</span>
             </div>
             <div class="bg-surface-container-lowest dark:bg-[#161b22] p-8 rounded-xl flex flex-col justify-center items-start border border-outline-variant/10 dark:border-gray-800 dark:border-gray-700 dark:border-gray-700 shadow-sm">
-                <span class="text-label-md uppercase tracking-[0.1em] text-on-surface-variant/60 dark:text-gray-500 font-bold text-xs mb-2">Most Deaths</span>
-                <span class="text-2xl font-extrabold text-on-surface dark:text-gray-200 tracking-tight">{% if top_death.name %}{{ top_death.name }}{% else %}-{% endif %}</span>
-                <span class="text-sm text-on-surface-variant/70 dark:text-gray-400 font-semibold mt-1">{{ top_death.deaths }} deaths</span>
+                <span class="text-label-md uppercase tracking-[0.1em] text-on-surface-variant/60 dark:text-gray-500 font-bold text-xs mb-2">Biggest donation</span>
+                <span class="text-2xl font-extrabold text-on-surface dark:text-gray-200 tracking-tight">{% if biggest_donation.name %}{{ biggest_donation.name }}{% else %}-{% endif %}</span>
+                <span class="text-sm text-on-surface-variant/70 dark:text-gray-400 font-semibold mt-1">{{ biggest_donation.deaths }} deaths</span>
+                {% if biggest_donation.silver_lost %}
+                <a href="#" class="donation-link text-sm font-bold text-tertiary dark:text-tertiary-fixed-dim mt-1 hover:underline cursor-pointer" onclick="showDonationItems(); return false;">
+                    {{ "{:,}".format(biggest_donation.silver_lost) }} 💰
+                </a>
+                {% endif %}
             </div>
         </div>
     </header>
@@ -329,6 +334,20 @@
     </div>
 </div>
 
+<!-- DONATION MODAL -->
+<div class="modal-overlay" id="donationModalOverlay">
+    <div class="modal-box">
+        <div class="flex items-center justify-between px-6 py-4 border-b border-outline-variant/20 dark:border-gray-700 dark:border-gray-700 bg-tertiary dark:bg-tertiary rounded-t-2xl">
+            <h3 class="text-white font-bold text-lg truncate">Dropped Items</h3>
+            <button onclick="closeDonationModal()" class="text-white/80 hover:text-white text-2xl leading-none">&times;</button>
+        </div>
+        <div class="p-6">
+            <h6 class="text-center font-bold mb-3 text-sm">Items dropped by {{ biggest_donation.name }} ({{ biggest_donation.deaths }} deaths)</h6>
+            <div class="flex flex-wrap justify-center gap-1" id="donationItemsGrid"></div>
+        </div>
+    </div>
+</div>
+
 <!-- FOOTER -->
 <footer class="mt-auto py-8 text-center bg-surface-container-lowest dark:bg-[#161b22] border-t border-outline-variant/10 dark:border-gray-800" style="font-size: 0.85rem;">
     <div class="max-w-5xl mx-auto px-4 text-on-surface-variant/80 dark:text-gray-400">
@@ -347,6 +366,9 @@
 </script>
 <script id="alliance-data-json" type="application/json">
     {{ alliances | tojson | safe }}
+</script>
+<script id="donation-items-json" type="application/json">
+    {{ biggest_donation.dropped_items | tojson | safe }}
 </script>
 
 <script>
@@ -372,6 +394,37 @@
     document.getElementById('killsModalOverlay').addEventListener('click', function(e) {
         if (e.target === this) closeModal();
     });
+
+    // --- DONATION MODAL ---
+    function openDonationModal() {
+        document.getElementById('donationModalOverlay').classList.add('active');
+        document.body.style.overflow = 'hidden';
+    }
+    function closeDonationModal() {
+        document.getElementById('donationModalOverlay').classList.remove('active');
+        document.body.style.overflow = '';
+    }
+    document.getElementById('donationModalOverlay').addEventListener('click', function(e) {
+        if (e.target === this) closeDonationModal();
+    });
+
+    window.showDonationItems = function() {
+        var items = JSON.parse(document.getElementById('donation-items-json').textContent);
+        var grid = document.getElementById('donationItemsGrid');
+        var html = '';
+        if (items && items.length > 0) {
+            items.forEach(function(item) {
+                html += '<div class="mini-grid-item bg-surface-container-low dark:bg-gray-800 border border-outline-variant/10 dark:border-gray-800 dark:border-gray-700 dark:border-gray-700">' +
+                    '<img src="https://render.albiononline.com/v1/item/' + item.Type + '.png?count=1&quality=' + item.Quality + '">' +
+                    '<span class="mini-item-count">' + item.Count + '</span>' +
+                    '</div>';
+            });
+        } else {
+            html = '<p class="text-on-surface-variant/50 dark:text-gray-500 text-sm">No items found</p>';
+        }
+        grid.innerHTML = html;
+        openDonationModal();
+    };
 
     // --- DATA PARSING ---
     let battleData = [];
