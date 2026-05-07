@@ -12,15 +12,7 @@ scheduler = APScheduler()
 scheduler.init_app(app)
 scheduler.start()
 
-# 1. Setup Rate Limiting
-limiter = Limiter(
-    get_remote_address,
-    app=app,
-    default_limits=["2000 per day", "200 per hour"], 
-    storage_uri="memory://"
-)
-
-# Block AI crawlers/bots
+# Block AI crawlers/bots (MUST be registered BEFORE the limiter)
 BLOCKED_BOTS = ['claudebot', 'gptbot', 'chatgpt-user', 'ccbot', 'anthropic-ai', 'google-extended', 'bytespider', 'semrushbot']
 
 @app.before_request
@@ -29,6 +21,14 @@ def block_bots():
     for bot in BLOCKED_BOTS:
         if bot in ua:
             abort(403)
+
+# 1. Setup Rate Limiting
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=["2000 per day", "200 per hour"], 
+    storage_uri="memory://"
+)
 
 mongoURI = os.getenv('TEST_URI')
 client = MongoClient(mongoURI)
@@ -88,112 +88,137 @@ def fetch_battles_data(sort_type='recent', time_range='week', limit=51, offset=0
                 ('sort', sort_type)
             ]
             
-            try:
-                response = requests.get(base_url, params=params, headers=headers, timeout=15)
-                
-                if response.status_code != 200:
-                    print(f"API Error {response.status_code} at offset {current_offset}. Stopping.")
-                    break
-
-                battles = response.json()
-                
-                if not battles:
-                    print(f"No battles returned at offset {current_offset}. Stopping.")
-                    break
-
-                count = 0
-                for b in battles:
-                    if b.get('totalFame', 0) <= 100000:
-                        continue
-                    try:
-                        t_str = b['endTime'].replace('Z', '')
-                        if '.' in t_str:
-                            main_part, frac_part = t_str.split('.')
-                            t_str = f"{main_part}.{frac_part[:6]}"
-                        end_time = datetime.fromisoformat(t_str).replace(tzinfo=timezone.utc)
-                    except (ValueError, TypeError):
-                        end_time = datetime.now(timezone.utc)
+            success = False
+            battles = []
+            for attempt in range(3):
+                try:
+                    response = requests.get(base_url, params=params, headers=headers, timeout=15)
                     
-                    try:
-                        guild_player_counts = {}
-                        players_dict = b.get('players', {})
-                        total_players = len(players_dict)
-                        searchable_player_names = []
-                        
-                        for p_id, p_data in players_dict.items():
-                            g_id = p_data.get('guildId')
-                            if g_id:
-                                guild_player_counts[g_id] = guild_player_counts.get(g_id, 0) + 1
-                        
-                            if p_data.get('name'):
-                                searchable_player_names.append(p_data['name'])
-                                
-                        processed_guilds = {}
-                        searchable_guild_names = []
-                        
-                        if 'guilds' in b:
-                            for gid, gdata in b['guilds'].items():
-                                g_name = gdata.get('name')
-                                if g_name:
-                                    searchable_guild_names.append(g_name)
-                                    
-                                processed_guilds[gid] = {
-                                    'name': g_name,
-                                    'kills': gdata.get('kills', 0),
-                                    'deaths': gdata.get('deaths', 0),
-                                    'killFame': gdata.get('killFame', 0),
-                                    'alliance': gdata.get('alliance'),
-                                    'allianceId': gdata.get('allianceId'),
-                                    'id': gdata.get('id'),
-                                    'playerCount': guild_player_counts.get(gid, 0)
-                                }
-
-                        processed_alliances = {}
-                        if 'alliances' in b:
-                            for aid, adata in b['alliances'].items():
-                                processed_alliances[aid] = {
-                                    'name': adata.get('name'),
-                                    'kills': adata.get('kills', 0),
-                                    'deaths': adata.get('deaths', 0),
-                                    'killFame': adata.get('killFame', 0),
-                                    'id': adata.get('id')
-                                }
-
-                        battle_doc = {
-                            'id': b['id'],
-                            'totalFame': b.get('totalFame', 0),
-                            'totalKills': b.get('totalKills', 0),
-                            'endTime': end_time,
-                            'totalPlayers': total_players,
-                            'guilds': processed_guilds,
-                            'alliances': processed_alliances,
-                            'player_names': searchable_player_names, 
-                            'guild_names': searchable_guild_names
-                        }
-
-                        battles_collection.update_one(
-                            {'id': b['id']},
-                            {'$set': battle_doc},
-                            upsert=True
-                        )
-                        count += 1
-                    except Exception as e:
-                        print(f"Error processing battle {b.get('id')}: {e}")
-                
-                print(f"Processed {count} valid battles at offset {current_offset} (Fetched {len(battles)} items).")
-                
-                total_fetched += len(battles)
-                current_offset += limit
-                
-                if len(battles) < limit:
-                    print("Reached end of battle history.")
-                    break
-                    
-                time.sleep(1.5)
-
-            except requests.exceptions.RequestException as e:
-                print(f"Network error at offset {current_offset}: {e}")
+                    if response.status_code == 200:
+                        battles = response.json()
+                        success = True
+                        break
+                    elif response.status_code == 429:
+                        print(f"Rate limited at offset {current_offset}. Retrying ({attempt+1}/3)...")
+                        time.sleep(3)
+                    else:
+                        print(f"API Error {response.status_code} at offset {current_offset}. Retrying ({attempt+1}/3)...")
+                        time.sleep(1.5)
+                except requests.exceptions.RequestException as e:
+                    print(f"Network error at offset {current_offset}: {e}. Retrying ({attempt+1}/3)...")
+                    time.sleep(1.5)
+            
+            if not success:
+                print(f"Failed after retries at offset {current_offset}. Stopping.")
                 break
+                
+            if not battles:
+                print(f"No battles returned at offset {current_offset}. Stopping.")
+                break
+
+            count = 0
+            for b in battles:
+                if b.get('totalFame', 0) <= 100000:
+                    continue
+                try:
+                    t_str = b['endTime'].replace('Z', '')
+                    if '.' in t_str:
+                        main_part, frac_part = t_str.split('.')
+                        t_str = f"{main_part}.{frac_part[:6]}"
+                    end_time = datetime.fromisoformat(t_str).replace(tzinfo=timezone.utc)
+                except (ValueError, TypeError):
+                    end_time = datetime.now(timezone.utc)
+                
+                try:
+                    guild_player_counts = {}
+                    players_dict = b.get('players', {})
+                    total_players = len(players_dict)
+                    searchable_player_names = []
+                    
+                    top_killer = {'name': '', 'kills': 0}
+                    top_death = {'name': '', 'deaths': 0}
+
+                    for p_id, p_data in players_dict.items():
+                        g_id = p_data.get('guildId')
+                        if g_id:
+                            guild_player_counts[g_id] = guild_player_counts.get(g_id, 0) + 1
+                    
+                        if p_data.get('name'):
+                            searchable_player_names.append(p_data['name'])
+                        
+                        p_kills = p_data.get('kills', 0)
+                        p_deaths = p_data.get('deaths', 0)
+                        if p_kills > top_killer['kills']:
+                            top_killer = {'name': p_data.get('name', ''), 'kills': p_kills}
+                        if p_deaths > top_death['deaths']:
+                            top_death = {'name': p_data.get('name', ''), 'deaths': p_deaths}
+                            
+                    processed_guilds = {}
+                    searchable_guild_names = []
+                    
+                    if 'guilds' in b:
+                        for gid, gdata in b['guilds'].items():
+                            g_name = gdata.get('name')
+                            if g_name:
+                                searchable_guild_names.append(g_name)
+                                
+                            processed_guilds[gid] = {
+                                'name': g_name,
+                                'kills': gdata.get('kills', 0),
+                                'deaths': gdata.get('deaths', 0),
+                                'killFame': gdata.get('killFame', 0),
+                                'alliance': gdata.get('alliance'),
+                                'allianceId': gdata.get('allianceId'),
+                                'id': gdata.get('id'),
+                                'playerCount': guild_player_counts.get(gid, 0)
+                            }
+
+                    processed_alliances = {}
+                    if 'alliances' in b:
+                        for aid, adata in b['alliances'].items():
+                            processed_alliances[aid] = {
+                                'name': adata.get('name'),
+                                'kills': adata.get('kills', 0),
+                                'deaths': adata.get('deaths', 0),
+                                'killFame': adata.get('killFame', 0),
+                                'id': adata.get('id')
+                            }
+
+                    battle_doc = {
+                        'id': b['id'],
+                        'totalFame': b.get('totalFame', 0),
+                        'totalKills': b.get('totalKills', 0),
+                        'endTime': end_time,
+                        'totalPlayers': total_players,
+                        'guilds': processed_guilds,
+                        'alliances': processed_alliances,
+                        'player_names': searchable_player_names, 
+                        'guild_names': searchable_guild_names,
+                        'topKiller': top_killer['name'],
+                        'topKillerKills': top_killer['kills'],
+                        'topDeath': top_death['name'],
+                        'topDeathDeaths': top_death['deaths']
+                    }
+
+                    battles_collection.update_one(
+                        {'id': b['id']},
+                        {'$set': battle_doc},
+                        upsert=True
+                    )
+                    count += 1
+                except Exception as e:
+                    print(f"Error processing battle {b.get('id')}: {e}")
+            
+            print(f"Processed {count} valid battles at offset {current_offset} (Fetched {len(battles)} items).")
+            
+            total_fetched += len(battles)
+            current_offset += limit
+            
+            if len(battles) < limit:
+                print("Reached end of battle history.")
+                break
+                
+            time.sleep(1.5)
 
     except Exception as e:
         print(f"Critical error fetching battles: {e}")
@@ -605,7 +630,12 @@ def api_battles_list():
             'endTime': ts_str,
             'totalPlayers': b.get('totalPlayers', 0),
             'totalFame': b.get('totalFame', 0),
-            'guild_names': guild_names
+            'totalKills': b.get('totalKills', 0),
+            'guild_names': guild_names,
+            'topKiller': b.get('topKiller', ''),
+            'topKillerKills': b.get('topKillerKills', 0),
+            'topDeath': b.get('topDeath', ''),
+            'topDeathDeaths': b.get('topDeathDeaths', 0)
         })
         
     status = get_scheduler_status('battle_scheduler_status')
@@ -681,6 +711,16 @@ def battle_details(battle_id):
             g['avgIp'] = 0
     total_players_count = len(all_player_stats)
 
+    top_killer = {'name': '', 'kills': 0}
+    top_death = {'name': '', 'deaths': 0}
+    for p in all_player_stats:
+        kc = len(p.get('Kills', []))
+        dc = max(p.get('Deaths', 0), len(p.get('DeathEvents', [])))
+        if kc > top_killer['kills']:
+            top_killer = {'name': p.get('Name', ''), 'kills': kc}
+        if dc > top_death['deaths']:
+            top_death = {'name': p.get('Name', ''), 'deaths': dc}
+
     unique_guilds = sorted(list(set(p['GuildName'] for p in all_player_stats if p['GuildName'])))
     unique_alliances = sorted(list(set(p['AllianceName'] for p in all_player_stats if p['AllianceName'])))
 
@@ -690,7 +730,8 @@ def battle_details(battle_id):
                            alliances=alliances_list,                           
                            all_player_stats=all_player_stats, 
                            total_players_count=total_players_count,
-                           
+                           top_killer=top_killer,
+                           top_death=top_death,
                            unique_guilds=unique_guilds,
                            unique_alliances=unique_alliances)
 

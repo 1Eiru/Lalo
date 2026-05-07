@@ -142,7 +142,7 @@
                             <th class="px-6 py-5 text-xs font-bold tracking-[0.1em] text-on-surface-variant dark:text-gray-400 uppercase whitespace-nowrap" style="width: 120px;">Battle ID</th>
                             <th class="px-6 py-5 text-xs font-bold tracking-[0.1em] text-on-surface-variant dark:text-gray-400 uppercase whitespace-nowrap" style="width: 180px;">Time</th>
                             <th class="px-6 py-5 text-xs font-bold tracking-[0.1em] text-on-surface-variant dark:text-gray-400 uppercase">Guilds</th>
-                            <th class="px-6 py-5 text-xs font-bold tracking-[0.1em] text-on-surface-variant dark:text-gray-400 uppercase text-right whitespace-nowrap" style="width: 160px;">Total fame</th>
+                            <th class="px-6 py-5 text-xs font-bold tracking-[0.1em] text-on-surface-variant dark:text-gray-400 uppercase text-right whitespace-nowrap" style="width: 180px;">Stats</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-surface-container-low dark:divide-gray-800">
@@ -177,9 +177,15 @@
                                 </span>
                             </td>
                             <td class="px-6 py-6 text-right whitespace-nowrap">
-                                <div class="flex flex-col items-end">
+                                <div class="flex flex-col items-end gap-0.5">
                                     <span class="text-base font-black text-tertiary dark:text-red-400">{{ "{:,}".format(battle.totalFame) }}</span>
-                                    <span class="text-[10px] text-on-surface-variant/60 dark:text-gray-500 font-medium">({{ battle.totalPlayers - 1 }}+ players)</span>
+                                    <span class="text-[11px] text-on-surface-variant dark:text-gray-300 font-semibold">{{ "{:,}".format(battle.get('totalKills', 0)) }} kills</span>
+                                    {% if battle.get('topKiller') %}
+                                    <span class="text-[10px] text-on-surface-variant/70 dark:text-gray-500" title="Most kills">⚔ {{ battle.topKiller }} ({{ battle.get('topKillerKills', 0) }})</span>
+                                    {% endif %}
+                                    {% if battle.get('topDeath') %}
+                                    <span class="text-[10px] text-on-surface-variant/70 dark:text-gray-500" title="Most deaths">💀 {{ battle.topDeath }} ({{ battle.get('topDeathDeaths', 0) }})</span>
+                                    {% endif %}
                                 </div>
                             </td>
                         </tr>
@@ -344,13 +350,22 @@
 
             // Stats
             var statsTd = $("<td>").addClass("px-6 py-6 text-right whitespace-nowrap");
-            var flexDiv = $("<div>").addClass("flex flex-col items-end");
+            var flexDiv = $("<div>").addClass("flex flex-col items-end").css("gap", "0.125rem");
 
             var fameSpan = $("<span>").addClass("text-base font-black text-tertiary dark:text-red-400").text(Number(battle.totalFame).toLocaleString());
-            var pCount = Math.max(0, battle.totalPlayers - 1);
-            var playerSmall = $("<span>").addClass("text-[10px] text-on-surface-variant/60 dark:text-gray-500 font-medium").text("(" + pCount + "+ players)");
+            var killsSpan = $("<span>").addClass("text-[11px] text-on-surface-variant dark:text-gray-300 font-semibold").text(Number(battle.totalKills || 0).toLocaleString() + " kills");
 
-            flexDiv.append(fameSpan).append(playerSmall);
+            flexDiv.append(fameSpan).append(killsSpan);
+
+            if (battle.topKiller) {
+                var kSpan = $("<span>").addClass("text-[10px] text-on-surface-variant/70 dark:text-gray-500").attr("title", "Most kills").text("⚔ " + battle.topKiller + " (" + (battle.topKillerKills || 0) + ")");
+                flexDiv.append(kSpan);
+            }
+            if (battle.topDeath) {
+                var dSpan = $("<span>").addClass("text-[10px] text-on-surface-variant/70 dark:text-gray-500").attr("title", "Most deaths").text("💀 " + battle.topDeath + " (" + (battle.topDeathDeaths || 0) + ")");
+                flexDiv.append(dSpan);
+            }
+
             statsTd.append(flexDiv);
 
             row.append(statsTd);

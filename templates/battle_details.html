@@ -197,6 +197,16 @@
                 <span class="text-label-md uppercase tracking-[0.1em] text-on-surface-variant/60 dark:text-gray-500 font-bold text-xs mb-2">Total Kills</span>
                 <span class="text-4xl font-black text-tertiary dark:text-tertiary-fixed-dim tracking-tighter">{{ "{:,}".format(battle.totalKills if battle.totalKills else 0) }}</span>
             </div>
+            <div class="bg-surface-container-lowest dark:bg-[#161b22] p-8 rounded-xl flex flex-col justify-center items-start border border-outline-variant/10 dark:border-gray-800 dark:border-gray-700 dark:border-gray-700 shadow-sm">
+                <span class="text-label-md uppercase tracking-[0.1em] text-on-surface-variant/60 dark:text-gray-500 font-bold text-xs mb-2">Top Killer</span>
+                <span class="text-2xl font-extrabold text-on-surface dark:text-gray-200 tracking-tight">{% if top_killer.name %}{{ top_killer.name }}{% else %}-{% endif %}</span>
+                <span class="text-sm text-tertiary dark:text-tertiary-fixed-dim font-semibold mt-1">{{ top_killer.kills }} kills</span>
+            </div>
+            <div class="bg-surface-container-lowest dark:bg-[#161b22] p-8 rounded-xl flex flex-col justify-center items-start border border-outline-variant/10 dark:border-gray-800 dark:border-gray-700 dark:border-gray-700 shadow-sm">
+                <span class="text-label-md uppercase tracking-[0.1em] text-on-surface-variant/60 dark:text-gray-500 font-bold text-xs mb-2">Most Deaths</span>
+                <span class="text-2xl font-extrabold text-on-surface dark:text-gray-200 tracking-tight">{% if top_death.name %}{{ top_death.name }}{% else %}-{% endif %}</span>
+                <span class="text-sm text-on-surface-variant/70 dark:text-gray-400 font-semibold mt-1">{{ top_death.deaths }} deaths</span>
+            </div>
         </div>
     </header>
 
