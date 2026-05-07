@@ -830,7 +830,18 @@ def battle_details(battle_id):
 @app.route("/player/<player_id>")
 def player(player_id):
     data = get_player_data(player_id)
-    return render_template('player.html', **data)
+    return render_template('player.html', **data, player_id=player_id)
+
+@app.route('/api/player/<player_id>/refresh')
+@limiter.limit("3 per minute")
+def api_refresh_player(player_id):
+    data = fetch_player_from_api(player_id)
+    cache_collection.update_one(
+        {'player_id': player_id},
+        {'$set': {'player_id': player_id, 'data': data, 'last_updated': datetime.now(timezone.utc)}},
+        upsert=True
+    )
+    return jsonify(data)
 
 @app.route('/api/search')
 @limiter.limit("20 per minute")

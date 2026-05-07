@@ -87,7 +87,7 @@
         .no-scrollbar::-webkit-scrollbar { display: none; }
     </style>
 </head>
-<body class="bg-surface dark:bg-[#0d1117] text-on-surface dark:text-gray-200 min-h-screen flex flex-col transition-colors duration-300">
+<body class="bg-surface dark:bg-[#0d1117] text-on-surface dark:text-gray-200 min-h-screen flex flex-col transition-colors duration-300" data-player-id="{{ player_id }}">
 
 {% include 'navbar.html' %}
 
@@ -110,19 +110,23 @@
             </div>
             
             <!-- Core PvP Stats Row -->
-            <div class="flex flex-wrap gap-4 md:gap-6">
+            <div class="flex flex-wrap gap-4 md:gap-6 items-center">
                 <div class="flex flex-col">
                     <span class="text-xs uppercase tracking-[0.1em] text-on-surface-variant/60 dark:text-gray-500 font-bold mb-1">Kill Fame 😍</span>
-                    <span class="text-2xl font-black text-primary dark:text-primary-fixed-dim tracking-tighter">{{ "{:,}".format(player.KillFame) }}</span>
+                    <span id="kill-fame-display" class="text-2xl font-black text-primary dark:text-primary-fixed-dim tracking-tighter">{{ "{:,}".format(player.KillFame) }}</span>
                 </div>
                 <div class="flex flex-col">
                     <span class="text-xs uppercase tracking-[0.1em] text-on-surface-variant/60 dark:text-gray-500 font-bold mb-1">Death Fame 😭</span>
-                    <span class="text-2xl font-black text-tertiary dark:text-tertiary-fixed-dim tracking-tighter">{{ "{:,}".format(player.DeathFame) }}</span>
+                    <span id="death-fame-display" class="text-2xl font-black text-tertiary dark:text-tertiary-fixed-dim tracking-tighter">{{ "{:,}".format(player.DeathFame) }}</span>
                 </div>
                 <div class="flex flex-col">
                     <span class="text-xs uppercase tracking-[0.1em] text-on-surface-variant/60 dark:text-gray-500 font-bold mb-1">Fame Ratio ⚖️</span>
-                    <span class="text-2xl font-black text-on-surface dark:text-gray-200 tracking-tighter">{{ "{:,}".format(player.FameRatio) }}</span>
+                    <span id="fame-ratio-display" class="text-2xl font-black text-on-surface dark:text-gray-200 tracking-tighter">{{ "{:,}".format(player.FameRatio) }}</span>
                 </div>
+                <button id="refresh-btn" class="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary/10 dark:bg-primary/20 text-primary dark:text-primary-fixed-dim hover:bg-primary/20 dark:hover:bg-primary/30 disabled:opacity-50 disabled:cursor-not-allowed transition-all text-sm font-semibold border border-primary/20 dark:border-primary/30 shadow-sm" title="Refresh kills &amp; deaths">
+                    <span class="material-symbols-outlined text-base" id="refresh-icon">refresh</span>
+                    <span id="refresh-label">Refresh</span>
+                </button>
             </div>
         </div>
     </header>
@@ -188,9 +192,10 @@
         <div class="space-y-4">
             <h4 class="font-bold text-lg text-primary dark:text-primary-fixed-dim border-b border-primary/20 pb-2 flex justify-between items-center">
                 <span>Recent Kills</span>
-                <span class="text-xs bg-primary/10 text-primary dark:text-primary-fixed-dim px-2 py-1 rounded-md">{{ kills|length }}</span>
+                <span id="kills-count" class="text-xs bg-primary/10 text-primary dark:text-primary-fixed-dim px-2 py-1 rounded-md">{{ kills|length }}</span>
             </h4>
             
+            <div id="kills-container">
             {% if kills %}
                 <div class="space-y-3 mt-2">
                 {% for kill in kills %}
@@ -230,15 +235,17 @@
             {% else %}
                 <p class="text-on-surface-variant/60 dark:text-gray-500 text-sm">No recent kills found.</p>
             {% endif %}
+            </div>
         </div>
 
         <!-- DEATHS COLUMN (RED) -->
         <div class="space-y-4">
             <h4 class="font-bold text-lg text-tertiary dark:text-tertiary-fixed-dim border-b border-tertiary/20 pb-2 flex justify-between items-center">
                 <span>Recent Deaths</span>
-                <span class="text-xs bg-tertiary/10 text-tertiary dark:text-tertiary-fixed-dim px-2 py-1 rounded-md">{{ deaths|length }}</span>
+                <span id="deaths-count" class="text-xs bg-tertiary/10 text-tertiary dark:text-tertiary-fixed-dim px-2 py-1 rounded-md">{{ deaths|length }}</span>
             </h4>
             
+            <div id="deaths-container">
             {% if deaths %}
                 <div class="space-y-3 mt-2">
                 {% for death in deaths %}
@@ -278,6 +285,7 @@
             {% else %}
                 <p class="text-on-surface-variant/60 dark:text-gray-500 text-sm">No recent deaths found.</p>
             {% endif %}
+            </div>
         </div>
     </div>
 
@@ -289,6 +297,173 @@
         <p class="mb-0 text-on-surface-variant/50 dark:text-gray-500">Not affiliated with Sandbox Interactive GmbH.</p>
     </div>
 </footer>
+
+<script>
+(function() {
+    var COOLDOWN_SECONDS = 90;
+    var playerId = document.body.getAttribute('data-player-id');
+
+    var btn = document.getElementById('refresh-btn');
+    var icon = document.getElementById('refresh-icon');
+    var label = document.getElementById('refresh-label');
+    var killFameEl = document.getElementById('kill-fame-display');
+    var deathFameEl = document.getElementById('death-fame-display');
+    var fameRatioEl = document.getElementById('fame-ratio-display');
+    var killsCount = document.getElementById('kills-count');
+    var deathsCount = document.getElementById('deaths-count');
+    var killsContainer = document.getElementById('kills-container');
+    var deathsContainer = document.getElementById('deaths-container');
+
+    var cooldownKey = 'ao-refresh-cooldown-' + playerId;
+    var timerInterval = null;
+
+    function formatNumber(n) {
+        return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    }
+
+    function buildKillHtml(kill) {
+        var ts = (kill.TimeStamp || '').substring(0, 10);
+        var fame = kill.TotalVictimKillFame || 0;
+        var victim = kill.Victim || {};
+        var guild = victim.GuildName || '';
+        return '<a href="/events/' + kill.EventId + '" class="relative block w-full bg-surface-container-lowest border-outline-variant/20 dark:bg-[#1e293b] rounded border dark:border-slate-700/50 flex overflow-hidden group shadow-sm dark:shadow-xl hover:opacity-90 transition-opacity">' +
+            '<div aria-hidden="true" class="w-1 h-full bg-primary dark:bg-[#0D6EFD] absolute left-0 top-0"></div>' +
+            '<div class="flex-1 p-4 pl-6 sm:p-5 sm:pl-7">' +
+            '<div class="flex justify-between items-start mb-3 sm:mb-4">' +
+            '<h2 class="text-on-surface dark:text-white text-base sm:text-lg font-bold tracking-tight truncate pr-4 group-hover:text-primary dark:group-hover:text-blue-400 transition-colors">' +
+            'Killed: <span>' + (victim.Name || 'Unknown') + '</span></h2>' +
+            '<time class="text-on-surface-variant/60 dark:text-slate-400 text-xs sm:text-sm font-medium whitespace-nowrap" datetime="' + ts + '">' + ts + '</time>' +
+            '</div>' +
+            '<div class="flex justify-between items-end">' +
+            '<div class="truncate pr-4"><p class="text-on-surface-variant/70 dark:text-slate-400 group-hover:text-primary/70 dark:group-hover:text-blue-400/70 text-xs sm:text-sm truncate transition-colors">' +
+            'Guild: <span class="font-medium">' + guild + '</span></p></div>' +
+            '<div class="bg-surface-container dark:bg-blue-900/30 px-2 sm:px-3 py-1 sm:py-1.5 rounded-md border border-transparent dark:border-blue-500/20 whitespace-nowrap">' +
+            '<span class="text-primary dark:text-[#60a5fa] text-xs sm:text-sm font-bold">' + formatNumber(fame) + ' Fame</span></div>' +
+            '</div></div></a>';
+    }
+
+    function buildDeathHtml(death) {
+        var ts = (death.TimeStamp || '').substring(0, 10);
+        var killer = death.Killer || {};
+        var guild = killer.GuildName || '';
+        var participants = death.Participants || [];
+        var pCount = participants.length;
+        var pLabel = pCount + ' Participant' + (pCount !== 1 ? 's' : '');
+        return '<a href="/events/' + death.EventId + '" class="relative block w-full bg-surface-container-lowest border-outline-variant/20 dark:bg-[#1e293b] rounded border dark:border-slate-700/50 flex overflow-hidden group shadow-sm dark:shadow-xl hover:opacity-90 transition-opacity">' +
+            '<div aria-hidden="true" class="w-1 h-full bg-tertiary dark:bg-[#dc3545] absolute left-0 top-0"></div>' +
+            '<div class="flex-1 p-4 pl-6 sm:p-5 sm:pl-7">' +
+            '<div class="flex justify-between items-start mb-3 sm:mb-4">' +
+            '<h2 class="text-on-surface dark:text-white text-base sm:text-lg font-bold tracking-tight truncate pr-4 group-hover:text-tertiary dark:group-hover:text-red-400 transition-colors">' +
+            'Killed by: <span>' + (killer.Name || 'Unknown') + '</span></h2>' +
+            '<time class="text-on-surface-variant/60 dark:text-slate-400 text-xs sm:text-sm font-medium whitespace-nowrap" datetime="' + ts + '">' + ts + '</time>' +
+            '</div>' +
+            '<div class="flex justify-between items-end">' +
+            '<div class="truncate pr-4"><p class="text-on-surface-variant/70 dark:text-slate-400 group-hover:text-tertiary/70 dark:group-hover:text-red-400/70 text-xs sm:text-sm truncate transition-colors">' +
+            'Guild: <span class="font-medium">' + guild + '</span></p></div>' +
+            '<div class="bg-error-container/50 dark:bg-red-900/30 px-2 sm:px-3 py-1 sm:py-1.5 rounded-md border border-transparent dark:border-red-500/20 whitespace-nowrap">' +
+            '<span class="text-tertiary dark:text-red-400 text-xs sm:text-sm font-bold">' + pLabel + '</span></div>' +
+            '</div></div></a>';
+    }
+
+    function updateUI(data) {
+        var player = data.player || {};
+        var kills = data.kills || [];
+        var deaths = data.deaths || [];
+
+        killFameEl.textContent = formatNumber(player.KillFame || 0);
+        deathFameEl.textContent = formatNumber(player.DeathFame || 0);
+        var df = player.DeathFame || 0;
+        var ratio = df > 0 ? Math.round((player.KillFame || 0) / df) : (player.KillFame || 0);
+        fameRatioEl.textContent = formatNumber(ratio);
+
+        killsCount.textContent = kills.length;
+
+        if (kills.length > 0) {
+            var killItems = '';
+            for (var i = 0; i < kills.length; i++) {
+                killItems += buildKillHtml(kills[i]);
+            }
+            killsContainer.innerHTML = '<div class="space-y-3 mt-2">' + killItems + '</div>';
+        } else {
+            killsContainer.innerHTML = '<p class="text-on-surface-variant/60 dark:text-gray-500 text-sm">No recent kills found.</p>';
+        }
+
+        deathsCount.textContent = deaths.length;
+
+        if (deaths.length > 0) {
+            var deathItems = '';
+            for (var j = 0; j < deaths.length; j++) {
+                deathItems += buildDeathHtml(deaths[j]);
+            }
+            deathsContainer.innerHTML = '<div class="space-y-3 mt-2">' + deathItems + '</div>';
+        } else {
+            deathsContainer.innerHTML = '<p class="text-on-surface-variant/60 dark:text-gray-500 text-sm">No recent deaths found.</p>';
+        }
+    }
+
+    function enableCooldown() {
+        var expiry = Date.now() + COOLDOWN_SECONDS * 1000;
+        localStorage.setItem(cooldownKey, expiry.toString());
+        btn.disabled = true;
+        startTimer(expiry);
+    }
+
+    function startTimer(expiry) {
+        if (timerInterval) clearInterval(timerInterval);
+        function tick() {
+            var remaining = Math.max(0, Math.ceil((expiry - Date.now()) / 1000));
+            if (remaining <= 0) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+                btn.disabled = false;
+                label.textContent = 'Refresh';
+                icon.textContent = 'refresh';
+                localStorage.removeItem(cooldownKey);
+                return;
+            }
+            var m = Math.floor(remaining / 60);
+            var s = remaining % 60;
+            label.textContent = m + ':' + (s < 10 ? '0' : '') + s;
+            icon.textContent = 'timer';
+        }
+        tick();
+        timerInterval = setInterval(tick, 1000);
+    }
+
+    function checkCooldown() {
+        var stored = localStorage.getItem(cooldownKey);
+        if (stored) {
+            var expiry = parseInt(stored, 10);
+            if (expiry > Date.now()) {
+                btn.disabled = true;
+                startTimer(expiry);
+            } else {
+                localStorage.removeItem(cooldownKey);
+            }
+        }
+    }
+
+    btn.addEventListener('click', function() {
+        if (btn.disabled) return;
+        enableCooldown();
+        fetch('/api/player/' + playerId + '/refresh')
+            .then(function(r) { return r.json(); })
+            .then(function(data) { updateUI(data); })
+            .catch(function() {
+                label.textContent = 'Failed';
+                icon.textContent = 'error';
+                setTimeout(function() {
+                    if (!btn.disabled) {
+                        label.textContent = 'Refresh';
+                        icon.textContent = 'refresh';
+                    }
+                }, 2000);
+            });
+    });
+
+    checkCooldown();
+})();
+</script>
 
 </body>
 </html>
