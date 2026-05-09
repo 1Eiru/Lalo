@@ -756,8 +756,10 @@ def battle_details(battle_id):
     for p in all_player_stats:
         gname = p.get('GuildName')
         if gname:
-            guild_ip_sums[gname] = guild_ip_sums.get(gname, 0) + p.get('IP', 0)
-            guild_ip_counts[gname] = guild_ip_counts.get(gname, 0) + 1
+            ip = p.get('IP', 0)
+            if ip > 0:
+                guild_ip_sums[gname] = guild_ip_sums.get(gname, 0) + ip
+                guild_ip_counts[gname] = guild_ip_counts.get(gname, 0) + 1
 
     for g in guilds_list:
         gname = g.get('name')
