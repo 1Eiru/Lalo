@@ -118,7 +118,7 @@ def fetch_battles_data(sort_type='recent', time_range='week', limit=51, offset=0
 
             count = 0
             for b in battles:
-                if b.get('totalFame', 0) <= 100000:
+                if b.get('totalFame', 0) < 500000:
                     continue
                 try:
                     t_str = b['endTime'].replace('Z', '')
@@ -569,7 +569,7 @@ def battles():
     search_query = request.args.get('search', '').strip()
     per_page = 25
     skip_amount = (page - 1) * per_page
-    base_query = {'totalFame': {'$gt': 100000}}
+    base_query = {'totalFame': {'$gte': 500000}}
     
     if search_query:
         search_filter = {}
@@ -643,7 +643,7 @@ def api_battles_list():
         return jsonify({'error': 'Search query must be at least 3 characters.'}), 400
 
     per_page = 25
-    base_query = {'totalFame': {'$gt': 100000}}
+    base_query = {'totalFame': {'$gte': 500000}}
 
     if search_query:
         if search_query.isdigit():
