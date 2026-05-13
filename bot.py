@@ -52,6 +52,15 @@ def log(message):
     now = datetime.now().strftime('%H:%M:%S')
     print(f"[{now}] {message}")
 
+def format_bytes(size_bytes):
+    if size_bytes == 0:
+        return "0 B"
+    for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+        if size_bytes < 1024:
+            return f"{size_bytes:.2f} {unit}"
+        size_bytes /= 1024
+    return f"{size_bytes:.2f} PB"
+
 def minify_event(event):
     def clean_item(item):
         if not item: return None
@@ -339,6 +348,60 @@ async def list_tracked(ctx):
     names = [p['name'] for p in players]
     msg = "**Tracked Players:**\n" + ", ".join(names)
     await ctx.send(msg)
+
+@bot.command()
+async def storage(ctx):
+    """Shows MongoDB storage stats."""
+    try:
+        stats = db.command("dbStats")
+        data_size = stats.get('dataSize', 0)
+        storage_size = stats.get('storageSize', 0)
+        index_size = stats.get('indexSize', 0)
+        fs_total = stats.get('fsTotalSize', 0)
+        fs_used = stats.get('fsUsedSize', 0)
+        collections = stats.get('collections', 0)
+        objects = stats.get('objects', 0)
+
+        embed = discord.Embed(title="MongoDB Storage", color=0x3b82f6)
+        embed.add_field(name="Collections", value=str(collections), inline=True)
+        embed.add_field(name="Documents", value=str(objects), inline=True)
+        embed.add_field(name="Data Size", value=format_bytes(data_size), inline=True)
+        embed.add_field(name="Index Size", value=format_bytes(index_size), inline=True)
+        embed.add_field(name="Storage Used", value=format_bytes(storage_size), inline=True)
+
+        if fs_total > 0:
+            fs_free = fs_total - fs_used
+            embed.add_field(name="Disk Free", value=format_bytes(fs_free), inline=True)
+            embed.add_field(name="Disk Total", value=format_bytes(fs_total), inline=True)
+            tier = "Self-Hosted"
+        else:
+            try:
+                ismaster = db.command("ismaster")
+                host = ismaster.get('me', '')
+                if 'mongodb.net' in host:
+                    config = settings_collection.find_one({'_id': 'atlas_config'})
+                    if config:
+                        tier = config.get('tier', 'Atlas')
+                        limit_mb = config.get('storage_limit_mb', 512)
+                    else:
+                        tier = "M0 (Free Tier)"
+                        limit_mb = 512
+                    used_mb = storage_size / (1024 * 1024)
+                    free_mb = limit_mb - used_mb
+                    embed.add_field(name="Free Space", value=f"{free_mb:,.2f} MB / {limit_mb} MB", inline=True)
+                else:
+                    tier = "Atlas"
+                    limit_mb = 512
+                    used_mb = storage_size / (1024 * 1024)
+                    free_mb = limit_mb - used_mb
+                    embed.add_field(name="Free Space", value=f"{free_mb:,.2f} MB / {limit_mb} MB", inline=True)
+            except:
+                tier = "Unknown"
+
+        embed.set_footer(text=f"Running on MongoDB {tier}")
+        await ctx.send(embed=embed)
+    except Exception as e:
+        await ctx.send(f"Error fetching storage: {e}")
 
 # --- SILVER LOGIC ---
 async def get_estimated_value(session, victim_data):
